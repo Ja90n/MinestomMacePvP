@@ -153,6 +153,26 @@ public class VanillaEnchantmentFeature implements EnchantmentFeature, Registrabl
 	}
 	
 	@Override
+	public int getDensity(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.DENSITY);
+	}
+	
+	@Override
+	public int getBreach(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.BREACH);
+	}
+	
+	@Override
+	public int getWindBurst(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.WIND_BURST);
+	}
+	
+	@Override
+	public int getLunge(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.LUNGE);
+	}
+	
+	@Override
 	public boolean shouldUnbreakingPreventDamage(ItemStack stack) {
 		int unbreakingLevel = stack.get(DataComponents.ENCHANTMENTS).level(Enchantment.UNBREAKING);
 		if (unbreakingLevel <= 0) return false;

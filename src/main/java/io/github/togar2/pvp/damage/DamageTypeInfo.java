@@ -68,8 +68,13 @@ public record DamageTypeInfo(boolean damagesHelmet, boolean bypassesArmor, boole
 			put(DamageType.PLAYER_ATTACK, new DamageTypeInfo().scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
 			put(DamageType.TRIDENT, new DamageTypeInfo().scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
 			put(DamageType.FIREWORKS, new DamageTypeInfo().scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
-			put(DamageType.SONIC_BOOM, new DamageTypeInfo().bypassesArmor(true).scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
-			put(DamageType.OUTSIDE_BORDER, new DamageTypeInfo().bypassesArmor(true));
+			put(DamageType.SONIC_BOOM, new DamageTypeInfo().unblockable(true).bypassesArmor(true).scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
+			put(DamageType.MACE_SMASH, new DamageTypeInfo().scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
+			put(DamageType.SPEAR, new DamageTypeInfo().scale(ScaleWithDifficulty.WHEN_CAUSED_BY_LIVING_NON_PLAYER));
+			put(DamageType.WIND_CHARGE, new DamageTypeInfo().unblockable(true));
+			put(DamageType.OUTSIDE_BORDER, new DamageTypeInfo().bypassesArmor(true).unblockable(true));
+			put(DamageType.LIGHTNING_BOLT, new DamageTypeInfo().fire(true).unblockable(true));
+			put(DamageType.CAMPFIRE, new DamageTypeInfo().bypassesArmor(true).fire(true).unblockable(true));
 		}
 	};
 

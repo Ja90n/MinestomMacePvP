@@ -30,5 +30,22 @@ public class AttackValues {
 	public record Final(float damage, boolean strong, boolean sprint,
 	                    int knockback, boolean critical, boolean magical,
 	                    int fireAspect, boolean sweeping, boolean sounds,
-	                    boolean playSoundsOnFail) {}
+	                    boolean playSoundsOnFail,
+	                    boolean maceSmash, boolean spear, double fallDistance,
+	                    float kineticDamage, boolean dismountTarget) {
+		public Final(float damage, boolean strong, boolean sprint,
+		             int knockback, boolean critical, boolean magical,
+		             int fireAspect, boolean sweeping, boolean sounds,
+		             boolean playSoundsOnFail,
+		             boolean maceSmash, boolean spear, double fallDistance) {
+			this(damage, strong, sprint, knockback, critical, magical, fireAspect, sweeping, sounds, playSoundsOnFail, maceSmash, spear, fallDistance, 0.0f, false);
+		}
+		
+		public Final(float damage, boolean strong, boolean sprint,
+		             int knockback, boolean critical, boolean magical,
+		             int fireAspect, boolean sweeping, boolean sounds,
+		             boolean playSoundsOnFail) {
+			this(damage, strong, sprint, knockback, critical, magical, fireAspect, sweeping, sounds, playSoundsOnFail, false, false, 0.0, 0.0f, false);
+		}
+	}
 }

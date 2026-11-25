@@ -6,15 +6,22 @@ import io.github.togar2.pvp.feature.RegistrableFeature;
 import io.github.togar2.pvp.feature.block.BlockFeature;
 import io.github.togar2.pvp.feature.config.DefinedFeature;
 import io.github.togar2.pvp.feature.config.FeatureConfiguration;
+import io.github.togar2.pvp.player.CombatPlayer;
+import io.github.togar2.pvp.utils.ViewUtil;
+import net.kyori.adventure.sound.Sound;
+import net.minestom.server.ServerFlag;
 import net.minestom.server.coordinate.Point;
+import net.minestom.server.coordinate.Vec;
 import net.minestom.server.entity.GameMode;
 import net.minestom.server.entity.Player;
 import net.minestom.server.event.EventNode;
+import net.minestom.server.event.player.PlayerUseItemEvent;
 import net.minestom.server.event.player.PlayerUseItemOnBlockEvent;
 import net.minestom.server.event.trait.EntityInstanceEvent;
 import net.minestom.server.instance.block.BlockFace;
 import net.minestom.server.item.ItemStack;
 import net.minestom.server.item.Material;
+import net.minestom.server.sound.SoundEvent;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -65,7 +72,35 @@ public class VanillaFireworkRocketFeature implements FireworkRocketFeature, Regi
             player.setItemInHand(event.getHand(), itemStack.withAmount(itemStack.amount() - 1));
         });
 
-        // TODO add plain PlayerUseItemEvent listener for elytra usage (need elytra first)
+        node.addListener(PlayerUseItemEvent.class, event -> {
+            if (event.getItemStack().material() != Material.FIREWORK_ROCKET) return;
+            Player player = event.getPlayer();
+            if (!player.isFlyingWithElytra()) return;
+
+            // Give an initial launch impulse in look direction
+            Vec lookDir = player.getPosition().direction();
+            player.setVelocity(player.getVelocity().add(lookDir.mul(1.5 * ServerFlag.SERVER_TICKS_PER_SECOND)));
+            if (player instanceof CombatPlayer combatPlayer) {
+                combatPlayer.sendImmediateVelocityUpdate();
+            }
+
+            ViewUtil.viewersAndSelf(player).playSound(Sound.sound(
+                    SoundEvent.ENTITY_FIREWORK_ROCKET_LAUNCH,
+                    Sound.Source.PLAYER,
+                    3.0f,
+                    1.0f
+            ), player);
+
+            FireworkRocketEntity fireworkRocketEntity = new FireworkRocketEntity(
+                    player,
+                    event.getItemStack(),
+                    false,
+                    blockFeature);
+            fireworkRocketEntity.setInstance(player.getInstance(), player.getPosition());
+
+            if (player.getGameMode().equals(GameMode.CREATIVE)) return;
+            player.setItemInHand(event.getHand(), event.getItemStack().withAmount(event.getItemStack().amount() - 1));
+        });
     }
 
     private static Point getBlockPlacement(@NotNull Point position, BlockFace face) {

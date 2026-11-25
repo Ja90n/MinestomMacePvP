@@ -150,8 +150,16 @@ public class VanillaDamageFeature implements DamageFeature, RegistrableFeature {
 			amount = amount - lastDamage;
 		}
 		
+		damage.setAmount(amount);
+		
+		// Damage armor durability (vanilla parity)
+		if (!typeInfo.damagesHelmet() && !typeInfo.bypassesArmor() && amount > 0) {
+			itemDamageFeature.damageArmor(entity, damageType, amount,
+					EquipmentSlot.HELMET, EquipmentSlot.CHESTPLATE, EquipmentSlot.LEGGINGS, EquipmentSlot.BOOTS);
+		}
+		
 		// Process armor and effects
-		amount = armorFeature.getDamageWithProtection(entity, damageType, amount);
+		amount = armorFeature.getDamageWithProtection(entity, damage);
 		
 		damage.setAmount(amount);
 		FinalDamageEvent finalDamageEvent = new FinalDamageEvent(entity, damage, 10, shouldAnimate);
@@ -185,14 +193,14 @@ public class VanillaDamageFeature implements DamageFeature, RegistrableFeature {
 				// Send damage animation
 				entity.sendPacketToViewersAndSelf(new DamageEventPacket(
 						entity.getEntityId(),
-						MinecraftServer.getDamageTypeRegistry().getId(damage.getType()),
-						damage.getAttacker() == null ? 0 : damage.getAttacker().getEntityId() + 1,
-						damage.getSource() == null ? 0 : damage.getSource().getEntityId() + 1,
+						damage.getType(),
+						attacker == null ? null : attacker.getEntityId(),
+						damage.getSource() == null ? null : damage.getSource().getEntityId(),
 						null
 				));
 			}
 			
-			if (!fullyBlocked && damage.getType() != DamageType.DROWN) {
+			if (!fullyBlocked && damage.getType() != DamageType.DROWN && damage.getType() != DamageType.SPEAR) {
 				if (attacker != null && !typeInfo.explosive()) {
 					knockbackFeature.applyDamageKnockback(damage, entity);
 				} else {

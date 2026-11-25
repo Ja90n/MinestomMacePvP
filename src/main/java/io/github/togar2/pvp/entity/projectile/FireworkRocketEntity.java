@@ -1,6 +1,7 @@
 package io.github.togar2.pvp.entity.projectile;
 
 import io.github.togar2.pvp.feature.block.BlockFeature;
+import io.github.togar2.pvp.player.CombatPlayer;
 import io.github.togar2.pvp.utils.ProjectileUtil;
 import net.kyori.adventure.sound.Sound;
 import net.minestom.server.ServerFlag;
@@ -84,8 +85,11 @@ public class FireworkRocketEntity extends CustomEntityProjectile {
           The shooter in FireworkRocketMeta does NOT mean the player who shot the firework from the crossbow,
           that's the shooter inherited from CustomEntityProjectile
         */
-        // TODO add firework elytra functionality (need elytra first)
-        meta.setShooter(null);
+        if (getShooter() instanceof LivingEntity living && living.isFlyingWithElytra()) {
+            meta.setShooter(living);
+        } else {
+            meta.setShooter(null);
+        }
         meta.setShotAtAngle(shotAtAngle);
         meta.setFireworkInfo(itemStack);
         return meta;
@@ -259,6 +263,17 @@ public class FireworkRocketEntity extends CustomEntityProjectile {
     @Override
     public void update(long time) {
         this.lifeTicks += 1;
+        FireworkRocketMeta meta = (FireworkRocketMeta) this.getEntityMeta();
+        if (meta.getShooter() instanceof LivingEntity living && living.isFlyingWithElytra()) {
+            if (this.instance != null && living.getInstance() == this.instance) {
+                this.teleport(living.getPosition());
+            }
+            Vec lookDir = living.getPosition().direction();
+            living.setVelocity(living.getVelocity().add(lookDir.mul(0.1 * ServerFlag.SERVER_TICKS_PER_SECOND)));
+            if (living instanceof CombatPlayer combatPlayer) {
+                combatPlayer.sendImmediateVelocityUpdate();
+            }
+        }
         if (this.lifeTicks >= this.lifeTimeTicks) {
             this.explode();
             this.remove();

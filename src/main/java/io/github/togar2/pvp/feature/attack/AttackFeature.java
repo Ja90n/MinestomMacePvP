@@ -18,4 +18,15 @@ public interface AttackFeature extends CombatFeature {
 	 * @return whether the attack was successful
 	 */
 	boolean performAttack(LivingEntity attacker, Entity target);
+
+	/**
+	 * Performs a Spear Lunge dash.
+	 *
+	 * @param attacker the attacking entity
+	 * @param lunge the lunge level
+	 * @return whether the lunge was performed
+	 */
+	default boolean performLunge(LivingEntity attacker, int lunge) {
+		return false;
+	}
 }

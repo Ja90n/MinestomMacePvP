@@ -45,9 +45,15 @@ public class CrystalEntity extends LivingEntity {
 		// Save this.instance locally
 		Instance instance = this.instance;
 		remove();
-		if (instance.getExplosionSupplier() != null
-				&& !DamageTypeInfo.of(damage.getType()).explosive()) {
-			instance.explode((float) position.x(), (float) position.y(), (float) position.z(), 6.0f);
+		if (instance.getExplosionSupplier() != null) {
+			net.kyori.adventure.nbt.CompoundBinaryTag.Builder data = net.kyori.adventure.nbt.CompoundBinaryTag.builder();
+			if (damage.getAttacker() != null) {
+				data.putString("causingEntity", damage.getAttacker().getUuid().toString());
+			}
+			if (fire) {
+				data.putBoolean("fire", true);
+			}
+			instance.explode((float) position.x(), (float) position.y(), (float) position.z(), 6.0f, data.build());
 		}
 
 		return true;

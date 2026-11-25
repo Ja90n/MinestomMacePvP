@@ -9,6 +9,7 @@ import io.github.togar2.pvp.utils.CombatVersion;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.entity.LivingEntity;
 import net.minestom.server.entity.attribute.Attribute;
+import net.minestom.server.entity.damage.Damage;
 import net.minestom.server.entity.damage.DamageType;
 import net.minestom.server.potion.PotionEffect;
 import net.minestom.server.potion.TimedPotion;
@@ -38,13 +39,29 @@ public class VanillaArmorFeature implements ArmorFeature {
 	}
 	
 	@Override
+	public float getDamageWithProtection(LivingEntity entity, Damage damage) {
+		DamageType damageType = MinecraftServer.getDamageTypeRegistry().get(damage.getType());
+		DamageTypeInfo info = DamageTypeInfo.of(damage.getType());
+		int breachLevel = 0;
+		if (damage.getAttacker() instanceof LivingEntity attacker) {
+			breachLevel = enchantmentFeature.getBreach(attacker);
+		}
+		float amount = getDamageWithArmor(entity, info, damage.getAmount(), breachLevel);
+		return getDamageWithEnchantments(entity, damageType, amount);
+	}
+	
+	@Override
 	public float getDamageWithProtection(LivingEntity entity, DamageType type, float amount) {
 		DamageTypeInfo info = DamageTypeInfo.of(MinecraftServer.getDamageTypeRegistry().getKey(type));
-		amount = getDamageWithArmor(entity, info, amount);
+		amount = getDamageWithArmor(entity, info, amount, 0);
 		return getDamageWithEnchantments(entity, type, amount);
 	}
 	
 	protected float getDamageWithArmor(LivingEntity entity, DamageTypeInfo typeInfo, float amount) {
+		return getDamageWithArmor(entity, typeInfo, amount, 0);
+	}
+	
+	protected float getDamageWithArmor(LivingEntity entity, DamageTypeInfo typeInfo, float amount, int breachLevel) {
 		if (typeInfo.bypassesArmor()) return amount;
 		
 		double armorValue = entity.getAttributeValue(Attribute.ARMOR);
@@ -52,10 +69,11 @@ public class VanillaArmorFeature implements ArmorFeature {
 			int armorMultiplier = 25 - (int) armorValue;
 			return (amount * (float) armorMultiplier) / 25;
 		} else {
-			return getDamageLeft(
-					amount, (float) Math.floor(armorValue),
-					(float) entity.getAttributeValue(Attribute.ARMOR_TOUGHNESS)
-			);
+			float armor = (float) armorValue;
+			float armorToughness = (float) entity.getAttributeValue(Attribute.ARMOR_TOUGHNESS);
+			float effectiveArmor = (float) (armor * (1.0 - 0.15 * breachLevel));
+			float effectiveToughness = (float) (armorToughness * (1.0 - 0.15 * breachLevel));
+			return getDamageLeft(amount, (float) Math.floor(effectiveArmor), effectiveToughness);
 		}
 	}
 	

@@ -25,6 +25,7 @@ public class VanillaAttackCooldownFeature implements AttackCooldownFeature, Regi
 	);
 	
 	public static final Tag<Long> LAST_ATTACKED_TICKS = Tag.Long("lastAttackedTicks");
+	public static final Tag<Long> PREVIOUS_ATTACKED_TICKS = Tag.Long("previousAttackedTicks");
 	
 	private final FeatureConfiguration configuration;
 	private CombatVersion version;
@@ -53,7 +54,12 @@ public class VanillaAttackCooldownFeature implements AttackCooldownFeature, Regi
 	
 	@Override
 	public void resetCooldownProgress(Player player) {
-		player.setTag(LAST_ATTACKED_TICKS, player.getAliveTicks());
+		Long lastAttacked = player.getTag(LAST_ATTACKED_TICKS);
+		long current = player.getAliveTicks();
+		if (lastAttacked == null || lastAttacked != current) {
+			player.setTag(PREVIOUS_ATTACKED_TICKS, lastAttacked);
+		}
+		player.setTag(LAST_ATTACKED_TICKS, current);
 	}
 	
 	@Override
@@ -63,7 +69,15 @@ public class VanillaAttackCooldownFeature implements AttackCooldownFeature, Regi
 		Long lastAttacked = player.getTag(LAST_ATTACKED_TICKS);
 		if (lastAttacked == null) return 1.0;
 		
-		long timeSinceLastAttacked = player.getAliveTicks() - lastAttacked;
+		long timeSinceLastAttacked;
+		if (lastAttacked == player.getAliveTicks()) {
+			Long prev = player.getTag(PREVIOUS_ATTACKED_TICKS);
+			if (prev == null) return 1.0;
+			timeSinceLastAttacked = player.getAliveTicks() - prev;
+		} else {
+			timeSinceLastAttacked = player.getAliveTicks() - lastAttacked;
+		}
+		
 		return MathUtils.clamp(
 				(timeSinceLastAttacked + 0.5) / getAttackCooldownProgressPerTick(player),
 				0, 1

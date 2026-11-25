@@ -60,6 +60,9 @@ public class VanillaSweepingFeature implements SweepingFeature {
 	
 	@Override
 	public float getSweepingDamage(LivingEntity attacker, float damage) {
+		if (attacker.getAttributeValue(Attribute.SWEEPING_DAMAGE_RATIO) > 0) {
+			return 1.0f + (float) attacker.getAttributeValue(Attribute.SWEEPING_DAMAGE_RATIO) * damage;
+		}
 		float sweepingMultiplier = 0;
 		int sweepingLevel = enchantmentFeature.getSweeping(attacker);
 		if (sweepingLevel > 0) sweepingMultiplier = 1.0f - (1.0f / (float) (sweepingLevel + 1));
@@ -83,10 +86,10 @@ public class VanillaSweepingFeature implements SweepingFeature {
 			// Apply sweeping knockback and damage to the entity
 			if (attacker.getPosition().distanceSquared(nearbyEntity.getPosition()) < 9.0) {
 				affectedEntities.add(living);
-				knockbackFeature.applySweepingKnockback(attacker, target);
+				knockbackFeature.applySweepingKnockback(attacker, living);
 				
 				float currentDamage = sweepingDamage + enchantmentFeature.getAttackDamage(
-						attacker.getItemInMainHand(), EntityGroup.ofEntity(target));
+						attacker.getItemInMainHand(), EntityGroup.ofEntity(living));
 				
 				living.damage(new Damage(
 						attacker instanceof Player ? DamageType.PLAYER_ATTACK : DamageType.MOB_ATTACK,

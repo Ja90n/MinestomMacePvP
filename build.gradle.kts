@@ -15,6 +15,7 @@ java {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
@@ -22,6 +23,10 @@ dependencies {
     compileOnly(libs.minestom)
     testImplementation(libs.minestom)
     compileOnly(libs.fastutil)
+    testImplementation(libs.fastutil)
+    testImplementation(platform("org.junit:junit-bom:5.11.4"))
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<JavaCompile> {
@@ -29,7 +34,7 @@ tasks.withType<JavaCompile> {
 }
 
 tasks.test {
-    onlyIf { false }
+    useJUnitPlatform()
 }
 
 mavenPublishing {
@@ -68,4 +73,13 @@ mavenPublishing {
 
 tasks.withType<GenerateModuleMetadata>().configureEach {
     dependsOn(tasks.withType<JavadocJar>())
+}
+
+tasks.register<JavaExec>("runServer") {
+    group = "application"
+    description = "Runs the PvP interactive test server"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("io.github.togar2.pvp.test.PvpServer")
+    standardInput = System.`in`
+    systemProperties(System.getProperties().mapKeys { it.key.toString() })
 }

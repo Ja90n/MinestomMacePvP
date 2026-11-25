@@ -66,20 +66,30 @@ public class VanillaBlockFeature implements BlockFeature {
 		if (damage.getAmount() <= 0) return false;
 		DamageTypeInfo info = DamageTypeInfo.of(damage.getType());
 		
-		// If damage doesn't bypass armor, no piercing, and a shield is active
-		if (!info.bypassesArmor() && !isPiercing(damage)
+		// If damage is blockable, doesn't bypass armor, no piercing, and a shield is active
+		if (!info.unblockable() && !info.bypassesArmor() && !isPiercing(damage)
 				&& entity.getEntityMeta() instanceof LivingEntityMeta meta
 				&& meta.isHandActive() && entity.getItemInHand(meta.getActiveHand()).material() == Material.SHIELD) {
 			if (version.legacy()) return true;
 			
-			if (damage.getSource() != null) {
-				Pos attackerPos = damage.getSource().getPosition();
+			// Vanilla 5-tick shield warm-up delay
+			if (entity instanceof Player player && player.getCurrentItemUseTime() < 5) {
+				return false;
+			}
+			
+			net.minestom.server.coordinate.Point attackerPos = damage.getSourcePosition();
+			if (attackerPos == null && damage.getSource() != null) {
+				attackerPos = damage.getSource().getPosition();
+			}
+			
+			if (attackerPos != null) {
 				Pos entityPos = entity.getPosition();
 				
-				Vec attackerPosVector = attackerPos.asVec();
-				Vec entityRotation = entityPos.direction();
-				Vec attackerDirection = entityPos.asVec().sub(attackerPosVector).normalize();
-				attackerDirection = attackerDirection.withY(0);
+				// Calculate horizontal viewing vector without pitch (vanilla blockedByShield parity)
+				Vec entityRotation = entityPos.withPitch(0.0f).direction().withY(0).normalize();
+				Vec attackerDirection = entityPos.asVec().sub(attackerPos.asVec()).withY(0);
+				if (attackerDirection.isZero()) return true;
+				attackerDirection = attackerDirection.normalize();
 				
 				// Dot product is lower than zero when the angle between the vectors is >90 degrees
 				return attackerDirection.dot(entityRotation) < 0.0;

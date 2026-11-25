@@ -86,7 +86,7 @@ public final class VanillaExplosionSupplier implements ExplosionSupplier {
 										Vec position = new Vec(centerX, centerY, centerZ);
 										Block block = instance.getBlock(position);
 
-										if (!block.isAir()) {
+										if (!block.air()) {
 											float explosionResistance = block.registry().explosionResistance();
 											strengthLeft -= (explosionResistance + 0.3F) * 0.3F;
 
@@ -143,10 +143,10 @@ public final class VanillaExplosionSupplier implements ExplosionSupplier {
 
 				Damage damageObj;
 				if (anchor) {
-					damageObj = new Damage(DamageType.BAD_RESPAWN_POINT, null, null, null, 0);
+					damageObj = new Damage(DamageType.BAD_RESPAWN_POINT, null, null, centerPoint, 0);
 				} else {
 					Entity causingEntity = getCausingEntity(instance);
-					damageObj = new Damage(DamageType.PLAYER_EXPLOSION, causingEntity, causingEntity, null, 0);
+					damageObj = new Damage(DamageType.PLAYER_EXPLOSION, causingEntity, causingEntity, centerPoint, 0);
 				}
 
 				// Blocks and entities list may be modified during the event call
@@ -246,8 +246,8 @@ public final class VanillaExplosionSupplier implements ExplosionSupplier {
 						ThreadLocalRandom random = ThreadLocalRandom.current();
 						for (Point point : blocks) {
 							if (random.nextInt(3) != 0
-									|| !instance.getBlock(point).isAir()
-									|| !instance.getBlock(point.sub(0, 1, 0)).isSolid())
+									|| !instance.getBlock(point).air()
+									|| !instance.getBlock(point.sub(0, 1, 0)).solid())
 								continue;
 
 							instance.setBlock(point, Block.FIRE);

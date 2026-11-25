@@ -5,6 +5,7 @@ import io.github.togar2.pvp.feature.RegistrableFeature;
 import io.github.togar2.pvp.feature.config.DefinedFeature;
 import io.github.togar2.pvp.feature.config.FeatureConfiguration;
 import io.github.togar2.pvp.feature.state.PlayerStateFeature;
+import io.github.togar2.pvp.utils.FluidUtil;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.minestom.server.MinecraftServer;
@@ -87,7 +88,9 @@ public class VanillaFallFeature implements FallFeature, RegistrableFeature {
 		
 		if ((entity instanceof Player player && player.isFlying())
 				|| entity.hasEffect(PotionEffect.LEVITATION)
-				|| entity.hasEffect(PotionEffect.SLOW_FALLING) || dy > 0) {
+				|| entity.hasEffect(PotionEffect.SLOW_FALLING) || dy > 0
+				|| (entity.getInstance() != null && entity.getInstance().getBlock(newPos).compare(Block.COBWEB))
+				|| (entity instanceof Player player && FluidUtil.isTouchingWater(player))) {
 			entity.setTag(FALL_DISTANCE, 0.0);
 			return;
 		}
@@ -121,7 +124,7 @@ public class VanillaFallFeature implements FallFeature, RegistrableFeature {
 		
 		double safeFallDistance = entity.getAttributeValue(Attribute.SAFE_FALL_DISTANCE);
 		if (newFallDistance > safeFallDistance) {
-			if (!block.isAir()) {
+			if (!block.air()) {
 				double damageDistance = Math.ceil(newFallDistance - safeFallDistance);
 				double particleMultiplier = Math.min(0.2 + damageDistance / 15.0, 2.5);
 				int particleCount = (int) (150 * particleMultiplier);
@@ -185,7 +188,7 @@ public class VanillaFallFeature implements FallFeature, RegistrableFeature {
 		Instance instance = livingEntity.getInstance();
 		
 		if (instance == null) return offset;
-		if (!instance.getBlock(offset).isAir()) return offset;
+		if (!instance.getBlock(offset).air()) return offset;
 		
 		Point offsetDown = offset.add(0, -1, 0);
 		Block block = instance.getBlock(offsetDown);

@@ -5,7 +5,9 @@ import io.github.togar2.pvp.feature.config.DefinedFeature;
 import io.github.togar2.pvp.feature.config.FeatureConfiguration;
 import io.github.togar2.pvp.feature.state.PlayerStateFeature;
 import io.github.togar2.pvp.utils.CombatVersion;
+import io.github.togar2.pvp.utils.FluidUtil;
 import net.minestom.server.entity.LivingEntity;
+import net.minestom.server.entity.Player;
 import net.minestom.server.potion.PotionEffect;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -36,9 +38,13 @@ public class VanillaCriticalFeature implements CriticalFeature {
 	
 	@Override
 	public boolean shouldCrit(LivingEntity attacker, AttackValues.PreCritical values) {
+		if (attacker instanceof Player player && FluidUtil.isTouchingWater(player)) return false;
+		
 		boolean critical = values.strong() && !playerStateFeature.isClimbing(attacker)
 				&& attacker.getVelocity().y() < 0 && !attacker.isOnGround()
 				&& !attacker.hasEffect(PotionEffect.BLINDNESS)
+				&& !attacker.hasEffect(PotionEffect.SLOW_FALLING)
+				&& !attacker.isFlyingWithElytra()
 				&& attacker.getVehicle() == null;
 		if (version.legacy()) return critical;
 		

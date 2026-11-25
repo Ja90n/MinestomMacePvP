@@ -137,10 +137,10 @@ public class VanillaKnockbackFeature implements KnockbackFeature {
 		}
 		
 		horizontal *= (1 - kbResistance);
-		vertical *= (1 - kbResistance);
+		if (horizontal < 0) horizontal = 0;
 		if (horizontal <= 0 && vertical <= 0) return null;
 		
-		Vec horizontalModifier = new Vec(dx, dz).normalize().mul(horizontal);
+		Vec horizontalModifier = horizontal <= 0 ? Vec.ZERO : new Vec(dx, dz).normalize().mul(horizontal);
 		return new KnockbackValues(horizontalModifier, vertical, settings.verticalLimit(), knockbackEvent.getAnimationType());
 	}
 	

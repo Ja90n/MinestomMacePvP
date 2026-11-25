@@ -109,6 +109,22 @@ public interface EnchantmentFeature extends CombatFeature {
 	
 	int getFireAspect(LivingEntity entity);
 	
+	default int getDensity(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.DENSITY);
+	}
+	
+	default int getBreach(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.BREACH);
+	}
+	
+	default int getWindBurst(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.WIND_BURST);
+	}
+	
+	default int getLunge(LivingEntity entity) {
+		return getEquipmentLevel(entity, Enchantment.LUNGE);
+	}
+	
 	boolean shouldUnbreakingPreventDamage(ItemStack stack);
 	
 	/**
