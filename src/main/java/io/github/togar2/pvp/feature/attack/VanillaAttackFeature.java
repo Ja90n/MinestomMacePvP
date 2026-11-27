@@ -16,6 +16,7 @@ import io.github.togar2.pvp.feature.item.ItemDamageFeature;
 import io.github.togar2.pvp.feature.knockback.KnockbackFeature;
 import io.github.togar2.pvp.player.CombatPlayer;
 import io.github.togar2.pvp.utils.CombatVersion;
+import io.github.togar2.pvp.utils.ExplosionKnockback;
 import io.github.togar2.pvp.utils.FluidUtil;
 import io.github.togar2.pvp.utils.ViewUtil;
 import net.kyori.adventure.audience.Audience;
@@ -198,14 +199,15 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 				fallFeature.resetFallDistance(attacker);
 			}
 
-			if (tool != null) {
-				itemDamageFeature.damageEquipment(attacker, EquipmentSlot.MAIN_HAND,
-					(tool.isSword() || tool == Tool.TRIDENT || tool.isMace() || tool.isSpear()) ? 1 : 2);
+			// Vanilla only damages the item and adds exhaustion when the target was actually hurt
+			
+			// The sprint knockback sound is played before the damage is dealt
+			if (attack.sounds() && attack.sprint()) {
+				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
+					SoundEvent.ENTITY_PLAYER_ATTACK_KNOCKBACK, Sound.Source.PLAYER,
+					1.0f, 1.0f
+				), attacker);
 			}
-			if (attacker instanceof Player player) {
-				exhaustionFeature.addAttackExhaustion(player);
-			}
-
 			// No damage sound
 			if (attack.sounds() && attack.playSoundsOnFail()) {
 				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
@@ -246,7 +248,8 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 				for (Entity nearby : target.getInstance().getNearbyEntities(targetPos, 3.5)) {
 					if (nearby == target || nearby == attacker) continue;
 					if (!(nearby instanceof LivingEntity livingNearby)) continue;
-					if (nearby instanceof Player p && p.getGameMode() == GameMode.SPECTATOR) continue;
+					if (nearby instanceof Player p && (p.getGameMode() == GameMode.SPECTATOR
+							|| (p.getGameMode() == GameMode.CREATIVE && p.isFlying()))) continue;
 					if (nearby.getEntityMeta() instanceof net.minestom.server.entity.metadata.other.ArmorStandMeta stand
 							&& stand.isMarker()) continue;
 					
@@ -268,22 +271,22 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 				}
 			}
 
-			// 3. Wind Burst
+			// 3. Wind Burst (vanilla: explode effect of the enchantment, radius 3.5 around the attacker, no damage)
 			int windBurst = enchantmentFeature.getWindBurst(attacker);
-			if (windBurst > 0) {
-				double upwardBlocksPerTick = windBurst == 1 ? 1.2 : (windBurst == 2 ? 1.75 : 2.2);
-				double upwardVel = upwardBlocksPerTick * ServerFlag.SERVER_TICKS_PER_SECOND;
-				attacker.setVelocity(new Vec(attacker.getVelocity().x(), upwardVel, attacker.getVelocity().z()));
-				if (attacker instanceof CombatPlayer customAttacker) {
-					customAttacker.sendImmediateVelocityUpdate();
-				}
+			boolean attackerFlying = attacker instanceof Player p && p.isFlying();
+			if (windBurst > 0 && attack.fallDistance() >= 1.5 && !attackerFlying && attacker.getInstance() != null) {
+				float multiplier = windBurst <= 3
+						? new float[]{1.2f, 1.75f, 2.2f}[windBurst - 1]
+						: 1.5f + 0.35f * (windBurst - 1);
+				Pos burstPos = attacker.getPosition();
+				ExplosionKnockback.apply(attacker.getInstance(), burstPos, 3.5f, multiplier, null, fallFeature, null);
 				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
 					SoundEvent.ENTITY_WIND_CHARGE_WIND_BURST, Sound.Source.PLAYER,
 					1.0f, 1.0f
 				), attacker);
 				attacker.sendPacketToViewersAndSelf(new ParticlePacket(
-					Particle.GUST_EMITTER_SMALL, false, false,
-					attacker.getPosition().x(), attacker.getPosition().y(), attacker.getPosition().z(),
+					Particle.GUST_EMITTER_LARGE, false, false,
+					burstPos.x(), burstPos.y(), burstPos.z(),
 					0, 0, 0, 0, 1
 				));
 			}
@@ -329,7 +332,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		}
 
 		// Play attack sounds
-		if (attack.sounds() && !attack.maceSmash()) {
+		if (attack.sounds()) {
 			Audience audience = attacker.getViewersAsAudience();
 			if (attacker instanceof Player player)
 				audience = Audience.audience(audience, player);
@@ -444,7 +447,6 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 
 		boolean critical = preSounds.critical();
 		boolean sweeping = preSounds.sweeping();
-		if (maceSmash) critical = false;
 
 		boolean sounds = version.modern();
 
@@ -463,7 +465,6 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		magicalDamage = finalAttackEvent.getEnchantsExtraDamage();
 
 		if (maceSmash) {
-			critical = false;
 			double remaining = fallDistance;
 			float smashBonus = 0.0f;
 			double stage1 = Math.min(remaining, 3.0);

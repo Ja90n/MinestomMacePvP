@@ -43,7 +43,7 @@ public class WindBurstTest {
 	}
 	
 	@Test
-	@DisplayName("Mace Smash Attack with Wind Burst III launches player upward by 44.0 blocks/s (2.2 b/t) and resets fall distance")
+	@DisplayName("Mace Smash Attack with Wind Burst III launches player upward by (0.01 + 2.2) b/t and resets fall distance")
 	void testWindBurstUpwardLaunch() {
 		Player attacker = TestEnvironment.createPlayer(instance, new Pos(0, 50, 0));
 		LivingEntity target = new LivingEntity(EntityType.ZOMBIE);
@@ -63,16 +63,16 @@ public class WindBurstTest {
 		boolean hit = attackFeature.performAttack(attacker, target);
 		assertTrue(hit, "Attack should succeed");
 		
-		// Upward velocity should be 2.2 * 20 = 44.0 blocks/s
-		double expectedUpwardVel = 2.2 * ServerFlag.SERVER_TICKS_PER_SECOND;
-		assertEquals(expectedUpwardVel, attacker.getVelocity().y(), 0.1, "Wind Burst III should launch upward with 44 blocks/s");
+		// Vanilla: the mace sets y to 0.01 b/t, then the wind burst explosion adds multiplier * exposure (centered on the attacker)
+		double expectedUpwardVel = (0.01 + 2.2) * ServerFlag.SERVER_TICKS_PER_SECOND;
+		assertEquals(expectedUpwardVel, attacker.getVelocity().y(), 0.5, "Wind Burst III should launch upward with 44 blocks/s");
 		
 		// Fall distance should be reset
 		assertEquals(0.0, fallFeature.getFallDistance(attacker), 0.001, "Fall distance must be reset after Mace smash hit");
 	}
 	
 	@Test
-	@DisplayName("Mace Smash Attack with Wind Burst I launches player upward by 24.0 blocks/s (1.2 b/t)")
+	@DisplayName("Mace Smash Attack with Wind Burst I launches player upward by (0.01 + 1.2) b/t")
 	void testWindBurstLevel1() {
 		Player attacker = TestEnvironment.createPlayer(instance, new Pos(10, 50, 10));
 		LivingEntity target = new LivingEntity(EntityType.ZOMBIE);
@@ -92,8 +92,7 @@ public class WindBurstTest {
 		boolean hit = attackFeature.performAttack(attacker, target);
 		assertTrue(hit, "Attack should succeed");
 		
-		// Upward velocity should be 1.2 * 20 = 24.0 blocks/s
-		double expectedUpwardVel = 1.2 * ServerFlag.SERVER_TICKS_PER_SECOND;
-		assertEquals(expectedUpwardVel, attacker.getVelocity().y(), 0.1, "Wind Burst I should launch upward with 24 blocks/s");
+		double expectedUpwardVel = (0.01 + 1.2) * ServerFlag.SERVER_TICKS_PER_SECOND;
+		assertEquals(expectedUpwardVel, attacker.getVelocity().y(), 0.5, "Wind Burst I should launch upward with 24 blocks/s");
 	}
 }

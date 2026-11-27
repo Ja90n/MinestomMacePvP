@@ -212,4 +212,13 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
 - **Sweeping:** basisschade is de schade na cooldown + mace-bonus (zonder crit/enchants), enchant-schade wordt per doelwit toegevoegd en alles wordt met de cooldown vermenigvuldigd.
 - **Mace smash:** AoE-knockback `(3.5 - d) * 0.7 * (valafstand > 5 ? 2 : 1) * (1 - resistance)`, vaste y-push 0.7, aanvaller y-velocity 0.01, lucht-geluid als het doelwit niet op de grond staat.
 - **Aanvalsbereik:** afstand van oog tot bounding box van het doelwit, `interaction range + 1.0` (was voet-tot-oog `+ 3.0`).
-- **Niet geverifieerd tegen de vanilla-jar:** Wind Burst (vanilla gebruikt een explosie in plaats van een vaste opwaartse snelheid) en de spear/kinetic-formules.
+- **Gecontroleerd tegen de gedecompileerde vanilla 26.2 server (`Player#attack`, `MaceItem`, `ExplodeEffect`, `ServerExplosion`, `LivingEntity#knockback`):**
+  - Mace smash kan in vanilla wel een critical hit zijn; dat was onterecht uitgeschakeld.
+  - Een mislukte aanval kost geen item-durability en geen uitputting; sprint-knockback-geluid wordt ook bij een mislukte hit afgespeeld; smash-geluiden komen bovenop de normale aanvalsgeluiden.
+  - Sweeping: snelheidsdrempel is `horizontale beweging < movement speed * 2.5` (was te streng, waardoor lopen nooit sweepte) en knockback alleen voor entiteiten die echt schade kregen.
+  - Mace AoE slaat spelers in creative-flight over.
+  - **Wind Burst** is nu de vanilla explosie (straal 3.5 om de aanvaller, multiplier 1.2/1.75/2.2, alleen bij valafstand >= 1.5 en niet vliegend) in plaats van een vaste opwaartse snelheid.
+  - **Wind charge** gebruikt nu straal 1.2 en multiplier 1.22 met de vanilla formule `(1 - afstand / 2r) * exposure * multiplier`, en explosies worden alleen tegengehouden door `EXPLOSION_KNOCKBACK_RESISTANCE` (niet `KNOCKBACK_RESISTANCE`).
+  - `VanillaExplosionSupplier.getExposure` gaf altijd 0 in open lucht door een verkeerd geplaatste shape; dat beinvloedde ook TNT en end crystals.
+- **Bekende resterende afwijkingen:** de speer is nog een aanval-gebaseerde benadering van vanilla's kinetic weapon (gebruik-gebaseerd met max-duur condities, contact-cooldown en `getAttributeBaseValue` als basisschade);
+  de multipliers en dismount-snelheden komen wel overeen. `ATTACK_KNOCKBACK` wordt naar een geheel getal afgerond (vanilla gebruikt een float), en het terugkaatsen van projectielen bij een klap is niet geimplementeerd.

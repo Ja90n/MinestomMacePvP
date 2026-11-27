@@ -204,7 +204,7 @@ public class CategoryBFixesTest {
 	}
 
 	@Test
-	@DisplayName("Wind Charge knockback factors in Attribute.KNOCKBACK_RESISTANCE")
+	@DisplayName("Wind Charge knockback factors in Attribute.EXPLOSION_KNOCKBACK_RESISTANCE (and not in KNOCKBACK_RESISTANCE), like vanilla")
 	void testWindChargeKnockbackResistance() {
 		InstanceContainer instance = net.minestom.server.MinecraftServer.getInstanceManager().createInstanceContainer();
 
@@ -216,7 +216,8 @@ public class CategoryBFixesTest {
 		// Target 2: 100% knockback resistance (1.0) - e.g. netherite armor
 		LivingEntity resistantTarget = new LivingEntity(net.minestom.server.entity.EntityType.ZOMBIE);
 		resistantTarget.setInstance(instance, new Pos(1.0, 50, 0)).join();
-		resistantTarget.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
+		resistantTarget.getAttribute(Attribute.EXPLOSION_KNOCKBACK_RESISTANCE).setBaseValue(1.0);
+		resistantTarget.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.0);
 
 		WindCharge charge1 = new WindCharge(null, null);
 		charge1.setInstance(instance, new Pos(0, 50, 0)).join();

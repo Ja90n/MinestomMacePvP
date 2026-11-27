@@ -82,4 +82,25 @@ public class WindChargeTest {
 		Vec vel = target.getVelocity();
 		assertTrue(vel.x() != 0 || vel.y() > 0 || vel.z() != 0, "Target should receive knockback velocity: " + vel);
 	}
+	
+	@Test
+	@DisplayName("Explosion knockback follows vanilla: (1 - dist / 2r) * exposure * multiplier, and solid blocks shield entities")
+	public void testExplosionKnockbackFormulaAndExposure() {
+		Pos center = new Pos(60, 10, 60);
+		
+		// Open air: entity directly above the center, 0.6 blocks away (dist = 0.6 / 2.4)
+		LivingEntity open = new LivingEntity(EntityType.ZOMBIE);
+		open.setInstance(instance, new Pos(60, 10.6, 60)).join();
+		io.github.togar2.pvp.utils.ExplosionKnockback.apply(instance, center, 1.2f, 1.22f, null, null, null);
+		double expected = (1.0 - 0.6 / 2.4) * 1.22 * net.minestom.server.ServerFlag.SERVER_TICKS_PER_SECOND;
+		assertEquals(expected, open.getVelocity().y(), 0.01, "Knockback power must follow the vanilla formula");
+		
+		// A solid wall between the center and the entity blocks the knockback
+		for (int y = 8; y <= 14; y++) for (int x = 69; x <= 71; x++) for (int z = 59; z <= 61; z++)
+			instance.setBlock(x, y, z, net.minestom.server.instance.block.Block.STONE);
+		LivingEntity shielded = new LivingEntity(EntityType.ZOMBIE);
+		shielded.setInstance(instance, new Pos(72.5, 10, 60.5)).join();
+		io.github.togar2.pvp.utils.ExplosionKnockback.apply(instance, new Pos(68.5, 10.5, 60.5), 3.5f, 2.2f, null, null, null);
+		assertEquals(0.0, shielded.getVelocity().length(), 1e-6, "Entities behind solid blocks must not be pushed");
+	}
 }

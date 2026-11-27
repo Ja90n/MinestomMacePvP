@@ -306,6 +306,7 @@ public final class VanillaExplosionSupplier implements ExplosionSupplier {
 	}
 
 	public static boolean noBlocking(Instance instance, Point start, Point end) {
-		return CollisionUtils.isLineOfSightReachingShape(instance, null, start, end, new BoundingBox(1, 1, 1), new Pos(0, 0, 0));
+		// The shape has to be located at the end of the ray, otherwise the line of sight never reaches it
+		return CollisionUtils.isLineOfSightReachingShape(instance, null, start, end, new BoundingBox(0.1, 0.1, 0.1), new Pos(end.x(), end.y() - 0.05, end.z()));
 	}
 }

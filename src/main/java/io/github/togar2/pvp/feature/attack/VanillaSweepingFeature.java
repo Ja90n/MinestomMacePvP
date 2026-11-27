@@ -51,8 +51,12 @@ public class VanillaSweepingFeature implements SweepingFeature {
 	public boolean shouldSweep(LivingEntity attacker, AttackValues.PreSweeping values) {
 		if (!values.strong() || values.critical() || values.sprint() || !attacker.isOnGround()) return false;
 		
-		double lastMoveDistance = attacker.getPreviousPosition().distance(attacker.getPosition()) * 0.6;
-		if (lastMoveDistance >= attacker.getAttributeValue(Attribute.MOVEMENT_SPEED)) return false;
+		// Vanilla: horizontal known movement (blocks per tick) has to be smaller than speed * 2.5
+		var previous = attacker.getPreviousPosition();
+		var current = attacker.getPosition();
+		double dx = current.x() - previous.x(), dz = current.z() - previous.z();
+		double maxSpeed = attacker.getAttributeValue(Attribute.MOVEMENT_SPEED) * 2.5;
+		if (dx * dx + dz * dz >= maxSpeed * maxSpeed) return false;
 		
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());
 		return tool != null && tool.isSword();
@@ -90,18 +94,20 @@ public class VanillaSweepingFeature implements SweepingFeature {
 			
 			// Apply sweeping knockback and damage to the entity
 			if (attacker.getPosition().distanceSquared(nearbyEntity.getPosition()) < 9.0) {
-				affectedEntities.add(living);
-				knockbackFeature.applySweepingKnockback(attacker, living);
 				
 				// Vanilla: getEnchantedDamage(target, sweepingDamage) * attackStrength
 				float currentDamage = (sweepingDamage + enchantmentFeature.getAttackDamage(
 						attacker.getItemInMainHand(), EntityGroup.ofEntity(living))) * (float) cooldownProgress;
 				
-				living.damage(new Damage(
+				// Vanilla only applies knockback to entities that were actually hurt
+				if (living.damage(new Damage(
 						attacker instanceof Player ? DamageType.PLAYER_ATTACK : DamageType.MOB_ATTACK,
 						attacker, attacker,
 						null, currentDamage
-				));
+				))) {
+					affectedEntities.add(living);
+					knockbackFeature.applySweepingKnockback(attacker, living);
+				}
 			}
 		}
 		
