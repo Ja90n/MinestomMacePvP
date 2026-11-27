@@ -39,7 +39,11 @@ tasks.test {
 
 mavenPublishing {
     publishToMavenCentral(automaticRelease = true, validateDeployment = false)
-    signAllPublications()
+    // Only sign when a signing key is configured (CI of the upstream project). Without this check,
+    // local builds, forks and JitPack fail because the signing tasks have no signatory.
+    if (providers.gradleProperty("signingInMemoryKey").isPresent) {
+        signAllPublications()
+    }
 
     val mcVersion = libs.versions.minestom.get().split("-")[1]
     val date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy.MM.dd"))

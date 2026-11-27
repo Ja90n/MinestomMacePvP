@@ -1,18 +1,23 @@
-# MinestomPvP
+# MinestomMacePvP
 
-[![license](https://img.shields.io/github/license/TogAr2/MinestomPvP.svg?style=for-the-badge)](../LICENSE)
+[![license](https://img.shields.io/github/license/Ja90n/MinestomMacePvP.svg?style=for-the-badge)](../LICENSE)
 [![platform](https://img.shields.io/badge/platform-Minestom-ff69b4?style=for-the-badge)](https://github.com/Minestom/Minestom)
+[![jitpack](https://img.shields.io/jitpack/version/com.github.Ja90n/MinestomMacePvP?style=for-the-badge)](https://jitpack.io/#Ja90n/MinestomMacePvP)
 
-MinestomPvP is a combat library for Minestom.
+MinestomMacePvP is a combat library for Minestom, a fork of [TogAr2/MinestomPvP](https://github.com/TogAr2/MinestomPvP)
+which supports the combat of **Minecraft 26.2** (mace, spears, wind charges, fireballs, ...).
 It tries to mimic vanilla (modern **and** pre-1.9) PvP as good as possible, while also focusing on customizability and usability.
+The modern combat has been checked against the decompiled vanilla 26.2 server.
 
-Not only does MinestomPvP provide combat mechanics, it also provides several related features (e.g., status effects and food).
+Not only does MinestomMacePvP provide combat mechanics, it also provides several related features (e.g., status effects and food).
 You can easily declare which features you want to use.
 
-The project is published on [maven central](https://central.sonatype.com/artifact/io.github.togar2/MinestomPvP/).
+The library is built for Minestom `2026.10.07-26.2` and is published through [JitPack](https://jitpack.io/#Ja90n/MinestomMacePvP).
+The original project is published on [maven central](https://central.sonatype.com/artifact/io.github.togar2/MinestomPvP/), without the 26.2 changes of this fork.
 
 ## Table of Contents
 
+- [Installation](#installation)
 - [Features](#features)
 - [Future Plans](#plans)
 - [Usage](#usage)
@@ -26,13 +31,82 @@ The project is published on [maven central](https://central.sonatype.com/artifac
 - [Contributing](#contributing)
 - [Credits](#credits)
 
+## Installation
+
+The library is available through [JitPack](https://jitpack.io/#Ja90n/MinestomMacePvP).
+Use `master-SNAPSHOT` for the latest version, a release tag, or a commit hash as the version.
+Minestom is not bundled, you have to add it to your project yourself (the library is built for `2026.10.07-26.2`).
+
+<details>
+<summary>Gradle (Kotlin)</summary>
+
+```kts
+repositories {
+    mavenCentral()
+    maven("https://jitpack.io")
+}
+
+dependencies {
+    implementation("net.minestom:minestom:2026.10.07-26.2")
+    implementation("com.github.Ja90n:MinestomMacePvP:master-SNAPSHOT")
+}
+```
+</details>
+
+<details>
+<summary>Gradle (Groovy)</summary>
+
+```groovy
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    implementation 'net.minestom:minestom:2026.10.07-26.2'
+    implementation 'com.github.Ja90n:MinestomMacePvP:master-SNAPSHOT'
+}
+```
+</details>
+
+<details>
+<summary>Maven</summary>
+
+```xml
+<repositories>
+  <repository>
+    <id>jitpack.io</id>
+    <url>https://jitpack.io</url>
+  </repository>
+</repositories>
+
+<dependencies>
+  <dependency>
+    <groupId>net.minestom</groupId>
+    <artifactId>minestom</artifactId>
+    <version>2026.10.07-26.2</version>
+  </dependency>
+  <dependency>
+    <groupId>com.github.Ja90n</groupId>
+    <artifactId>MinestomMacePvP</artifactId>
+    <version>master-SNAPSHOT</version>
+  </dependency>
+</dependencies>
+```
+</details>
+
+> [!NOTE]
+> The packages are still `io.github.togar2.pvp`, so existing code using MinestomPvP keeps working after switching the dependency.
+
 ## Features
 
 Currently, most vanilla PvP mechanics are supported.
 
-- Attack cooldown
+- Attack cooldown (including attribute swapping: equipment attributes are applied at the end of the tick, like vanilla)
 - Damage invulnerability
 - Weapons
+- Mace (smash attacks, density, breach, wind burst)
+- Spears (jab, charging with kinetic damage, knockback and dismounting, lunge)
 - Armor
 - Shields (or sword blocking)
 - Food
@@ -41,6 +115,8 @@ Currently, most vanilla PvP mechanics are supported.
 - Tridents (with riptide or loyalty)
 - Fishing rods (only hooking entities or legacy knockback, not fishing)
 - Other projectiles (potions, snowballs, eggs, ender pearls)
+- Wind charges (wind jumps, instant pearl catch) and fireballs (`LargeFireball`, `SmallFireball`), which can be deflected by hitting them
+- Teams (teammates cannot hurt each other without friendly fire)
 - All enchantments possible with the above features (this includes protection, sharpness, knockback, ...)
 - Fall damage
 - End crystals
@@ -50,7 +126,7 @@ Currently, most vanilla PvP mechanics are supported.
 ## Plans
 
 - Support for (some) water mechanics (e.g. slowing projectiles down)
-- 1.21 features (the library is already 1.21 compatible, just doesn't support its combat features)
+- Fireballs are not spawned by the library itself (there are no ghasts, blazes or dispensers), use `LargeFireball#launch` or `SmallFireball#launch`
 - Rework of the tool & armor registry to allow for customization
 
 ## Usage
@@ -323,6 +399,8 @@ If anything does not integrate with your project, you can also open an issue (or
 I aim towards making this extension as usable as possible!
 
 ## Credits
+
+This is a fork of [MinestomPvP](https://github.com/TogAr2/MinestomPvP) by [TogAr2](https://github.com/TogAr2).
 
 Thanks to [kiip1](https://github.com/kiip1) for testing and finding bugs.
 
