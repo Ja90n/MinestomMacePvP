@@ -136,9 +136,8 @@ public enum Tool {
 	}
 	
 	private static boolean hasDefaultAttributes(ItemStack stack) {
-		// When modifiers tag is not empty, default modifiers are not
-		return !stack.componentPatch().has(DataComponents.ATTRIBUTE_MODIFIERS)
-				|| Objects.requireNonNull(stack.get(DataComponents.ATTRIBUTE_MODIFIERS)).modifiers().isEmpty();
+		// An explicit attribute modifiers component (even an empty one) replaces the default modifiers
+		return !stack.componentPatch().has(DataComponents.ATTRIBUTE_MODIFIERS);
 	}
 	
 	public boolean isAxe() {

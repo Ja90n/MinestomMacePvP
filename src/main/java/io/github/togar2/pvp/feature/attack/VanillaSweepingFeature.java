@@ -71,6 +71,11 @@ public class VanillaSweepingFeature implements SweepingFeature {
 	
 	@Override
 	public Collection<LivingEntity> applySweeping(LivingEntity attacker, LivingEntity target, float damage) {
+		return applySweeping(attacker, target, damage, 1.0);
+	}
+	
+	@Override
+	public Collection<LivingEntity> applySweeping(LivingEntity attacker, LivingEntity target, float damage, double cooldownProgress) {
 		float sweepingDamage = getSweepingDamage(attacker, damage);
 		
 		// Loop and check for colliding entities
@@ -88,8 +93,9 @@ public class VanillaSweepingFeature implements SweepingFeature {
 				affectedEntities.add(living);
 				knockbackFeature.applySweepingKnockback(attacker, living);
 				
-				float currentDamage = sweepingDamage + enchantmentFeature.getAttackDamage(
-						attacker.getItemInMainHand(), EntityGroup.ofEntity(living));
+				// Vanilla: getEnchantedDamage(target, sweepingDamage) * attackStrength
+				float currentDamage = (sweepingDamage + enchantmentFeature.getAttackDamage(
+						attacker.getItemInMainHand(), EntityGroup.ofEntity(living))) * (float) cooldownProgress;
 				
 				living.damage(new Damage(
 						attacker instanceof Player ? DamageType.PLAYER_ATTACK : DamageType.MOB_ATTACK,

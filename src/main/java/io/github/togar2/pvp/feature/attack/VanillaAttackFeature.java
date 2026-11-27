@@ -61,7 +61,11 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		FeatureType.FALL, FeatureType.VERSION
 	);
 
-	private static final double ATTACK_RANGE_MARGIN = 3.0;
+	/**
+	 * Server side tolerance on top of the entity interaction range
+	 * (vanilla: Player#isWithinEntityInteractionRange(aabb, 1.0)).
+	 */
+	private static final double ATTACK_RANGE_MARGIN = 1.0;
 
 	private final FeatureConfiguration configuration;
 
@@ -101,9 +105,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		node.addListener(EntityAttackEvent.class, event -> {
 			if (event.getEntity() instanceof Player player && player.getGameMode() != GameMode.SPECTATOR && !player.isDead()) {
 				Entity target = event.getTarget();
-				double maxDistanceSquared = Math.pow(player.getAttributeValue(Attribute.ENTITY_INTERACTION_RANGE) + ATTACK_RANGE_MARGIN, 2);
-				if (player.getPosition().distanceSquared(target.getPosition().add(0, target.getEyeHeight(), 0)) < maxDistanceSquared)
-					performAttack(player, target);
+				if (isWithinInteractionRange(player, target)) performAttack(player, target);
 			}
 		});
 
@@ -124,6 +126,22 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		});
 	}
 
+	/**
+	 * Vanilla range check: the distance between the eyes of the player and the closest point
+	 * of the bounding box of the target has to be smaller than interaction range + margin.
+	 */
+	protected boolean isWithinInteractionRange(Player player, Entity target) {
+		double range = player.getAttributeValue(Attribute.ENTITY_INTERACTION_RANGE) + ATTACK_RANGE_MARGIN;
+		Pos eye = player.getPosition().add(0, player.getEyeHeight(), 0);
+		Pos pos = target.getPosition();
+		var box = target.getBoundingBox();
+		double halfWidth = box.width() / 2, halfDepth = box.depth() / 2;
+		double dx = Math.max(Math.max(pos.x() - halfWidth - eye.x(), 0), eye.x() - (pos.x() + halfWidth));
+		double dy = Math.max(Math.max(pos.y() - eye.y(), 0), eye.y() - (pos.y() + box.height()));
+		double dz = Math.max(Math.max(pos.z() - halfDepth - eye.z(), 0), eye.z() - (pos.z() + halfDepth));
+		return dx * dx + dy * dy + dz * dz < range * range;
+	}
+	
 	private void handleSpearLungeAction(Player player) {
 		ItemStack stack = player.getItemInMainHand();
 		Tool tool = Tool.fromMaterial(stack.material());
@@ -205,7 +223,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		// Knockback and sweeping
 		knockbackFeature.applyAttackKnockback(attacker, living, attack.knockback());
 		if (attack.sweeping()) {
-			affectedEntities = sweepingFeature.applySweeping(attacker, living, attack.damage());
+			affectedEntities = sweepingFeature.applySweeping(attacker, living, attack.sweepDamage(), attack.cooldownProgress());
 			affectedEntities.add(living);
 		}
 
@@ -216,37 +234,36 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			// 1. Negate fall damage
 			fallFeature.resetFallDistance(attacker);
 
-			// 2. AoE Smash Knockback
+			// 2. AoE Smash Knockback (vanilla: MaceItem#knockback)
+			// The attacker also loses its vertical momentum (y velocity is set to 0.01 blocks/tick)
+			attacker.setVelocity(attacker.getVelocity().withY(0.01 * ServerFlag.SERVER_TICKS_PER_SECOND));
+			if (attacker instanceof CombatPlayer customAttacker) {
+				customAttacker.sendImmediateVelocityUpdate();
+			}
 			if (target.getInstance() != null) {
 				Pos targetPos = target.getPosition();
+				double fallMultiplier = attack.fallDistance() > 5.0 ? 2.0 : 1.0;
 				for (Entity nearby : target.getInstance().getNearbyEntities(targetPos, 3.5)) {
 					if (nearby == target || nearby == attacker) continue;
 					if (!(nearby instanceof LivingEntity livingNearby)) continue;
-					if (nearby.getEntityType() == EntityType.ARMOR_STAND) continue;
-
-					double dist = targetPos.distance(nearby.getPosition());
-					if (dist <= 3.5) {
-						double strength = (3.5 - dist) / 3.5 * 0.7;
-						double kbResistance = livingNearby.getAttributeValue(Attribute.KNOCKBACK_RESISTANCE);
-						double horizontalImpulse = strength * Math.max(0.0, 1.0 - kbResistance) * ServerFlag.SERVER_TICKS_PER_SECOND;
-						double verticalImpulse = Math.min(0.5, 0.35 * (3.5 - dist) / 3.5) * ServerFlag.SERVER_TICKS_PER_SECOND;
-
-						Pos nearbyPos = nearby.getPosition();
-						Vec dir = new Vec(nearbyPos.x() - targetPos.x(), 0, nearbyPos.z() - targetPos.z());
-						if (dir.isZero()) {
-							dir = new Vec(1, 0, 0);
-						} else {
-							dir = dir.normalize();
-						}
-
-						livingNearby.setVelocity(livingNearby.getVelocity().add(
-							dir.x() * horizontalImpulse,
-							verticalImpulse,
-							dir.z() * horizontalImpulse
-						));
-						if (livingNearby instanceof CombatPlayer customNearby) {
-							customNearby.sendImmediateVelocityUpdate();
-						}
+					if (nearby instanceof Player p && p.getGameMode() == GameMode.SPECTATOR) continue;
+					if (nearby.getEntityMeta() instanceof net.minestom.server.entity.metadata.other.ArmorStandMeta stand
+							&& stand.isMarker()) continue;
+					
+					Pos nearbyPos = nearby.getPosition();
+					if (targetPos.distanceSquared(nearbyPos) > 3.5 * 3.5) continue;
+					
+					// delta is normalized in 3D, only its horizontal components are used
+					Vec delta = new Vec(nearbyPos.x() - targetPos.x(), nearbyPos.y() - targetPos.y(), nearbyPos.z() - targetPos.z());
+					double power = (3.5 - delta.length()) * 0.7 * fallMultiplier
+							* (1.0 - livingNearby.getAttributeValue(Attribute.KNOCKBACK_RESISTANCE));
+					if (power <= 0) continue;
+					Vec push = delta.length() < 1.0E-5 ? Vec.ZERO : delta.normalize().mul(power);
+					
+					double tps = ServerFlag.SERVER_TICKS_PER_SECOND;
+					livingNearby.setVelocity(livingNearby.getVelocity().add(push.x() * tps, 0.7 * tps, push.z() * tps));
+					if (livingNearby instanceof CombatPlayer customNearby) {
+						customNearby.sendImmediateVelocityUpdate();
 					}
 				}
 			}
@@ -289,7 +306,8 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			}
 
 			// 5. Smash sounds
-			SoundEvent smashSound = attack.fallDistance() >= 5.0 ? SoundEvent.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvent.ITEM_MACE_SMASH_GROUND;
+			SoundEvent smashSound = !target.isOnGround() ? SoundEvent.ITEM_MACE_SMASH_AIR
+					: attack.fallDistance() > 5.0 ? SoundEvent.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvent.ITEM_MACE_SMASH_GROUND;
 			ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(smashSound, Sound.Source.PLAYER, 1.0f, 1.0f), target);
 		}
 
@@ -465,6 +483,9 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			}
 			damage += smashBonus;
 		}
+		// Vanilla bases the sweeping damage on the damage after the cooldown and the mace bonus,
+		// but before critical hits and enchantment damage
+		float sweepDamage = damage;
 
 		float kineticDamage = 0.0f;
 		boolean dismountTarget = false;
@@ -538,7 +559,8 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			finalAttackEvent.hasAttackSounds(),
 			finalAttackEvent.playSoundsOnFail(),
 			maceSmash, isSpear, fallDistance,
-			kineticDamage, dismountTarget
+			kineticDamage, dismountTarget,
+			sweepDamage, cooldownProgress
 		);
 	}
 

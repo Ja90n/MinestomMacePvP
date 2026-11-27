@@ -36,93 +36,55 @@ public class KnockbackTest {
 		}
 	}
 	
-	@Test
-	@DisplayName("With kbResistance = 1.0 (full netherite), vertical knockback is NOT reduced to 0 (vertical > 0) while horizontal is 0")
-	void testKnockbackWithFullResistance() {
-		KnockbackFeature kbFeature = CombatFeatures.modernVanilla().get(FeatureType.KNOCKBACK);
-		assertTrue(kbFeature instanceof VanillaKnockbackFeature);
-		
-		net.minestom.server.instance.InstanceContainer instance = net.minestom.server.MinecraftServer.getInstanceManager().createInstanceContainer();
-		
-		LivingEntity attacker = new GroundedEntity(EntityType.ZOMBIE);
-		attacker.setInstance(instance, new Pos(0, 0, 0, 0, 0)).join();
-		
-		GroundedEntity targetWithRes = new GroundedEntity(EntityType.ZOMBIE);
-		targetWithRes.setInstance(instance, new Pos(1, 0, 0)).join();
-		targetWithRes.setOnGround(true);
-		targetWithRes.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(1.0); // full resistance (e.g. netherite)
-		targetWithRes.setVelocity(Vec.ZERO);
-		
-		Damage damage = new Damage(DamageType.PLAYER_ATTACK, attacker, attacker, null, 5.0f);
-		boolean appliedWithRes = kbFeature.applyDamageKnockback(damage, targetWithRes);
-		
-		assertTrue(appliedWithRes, "Knockback should still apply when vertical knockback is present");
-		
-		Vec velWithRes = targetWithRes.getVelocity();
-		double horizontalMagWithRes = Math.sqrt(velWithRes.x() * velWithRes.x() + velWithRes.z() * velWithRes.z());
-		
-		// Horizontal knockback should be completely 0
-		assertEquals(0.0, horizontalMagWithRes, 1e-6, "Horizontal knockback must be 0 with kbResistance = 1.0");
-		assertEquals(0.0, velWithRes.x(), 1e-6, "Velocity X must be 0 with kbResistance = 1.0");
-		assertEquals(0.0, velWithRes.z(), 1e-6, "Velocity Z must be 0 with kbResistance = 1.0");
-		
-		// Vertical knockback should NOT be reduced to 0
-		assertTrue(velWithRes.y() > 0.0, "Vertical knockback must NOT be reduced to 0 (must be > 0), actual: " + velWithRes.y());
-		assertEquals(io.github.togar2.pvp.feature.knockback.KnockbackSettings.DEFAULT.vertical(), velWithRes.y(), 1e-4,
-				"Vertical knockback should match settings vertical");
-		
-		// Compare with target having kbResistance = 0.0
-		GroundedEntity targetNoRes = new GroundedEntity(EntityType.ZOMBIE);
-		targetNoRes.setInstance(instance, new Pos(1, 0, 0)).join();
-		targetNoRes.setOnGround(true);
-		targetNoRes.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(0.0);
-		targetNoRes.setVelocity(Vec.ZERO);
-		
-		boolean appliedNoRes = kbFeature.applyDamageKnockback(damage, targetNoRes);
-		assertTrue(appliedNoRes);
-		
-		Vec velNoRes = targetNoRes.getVelocity();
-		double horizontalMagNoRes = Math.sqrt(velNoRes.x() * velNoRes.x() + velNoRes.z() * velNoRes.z());
-		
-		assertTrue(horizontalMagNoRes > 0.0, "Target with no resistance must have horizontal knockback > 0");
-		assertEquals(velNoRes.y(), velWithRes.y(), 1e-6, "Vertical knockback must be identical regardless of knockback resistance");
+	private static GroundedEntity grounded(net.minestom.server.instance.InstanceContainer instance, Pos pos, double resistance) {
+		GroundedEntity entity = new GroundedEntity(EntityType.ZOMBIE);
+		entity.setInstance(instance, pos).join();
+		entity.setOnGround(true);
+		entity.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(resistance);
+		entity.setVelocity(Vec.ZERO);
+		return entity;
 	}
 	
 	@Test
-	@DisplayName("Attack knockback and sweeping knockback also preserve vertical knockback when kbResistance = 1.0")
-	void testAttackAndSweepingKnockbackWithFullResistance() {
+	@DisplayName("Vanilla: kbResistance = 1.0 removes ALL knockback, horizontal and vertical (LivingEntity#knockback returns early)")
+	void testKnockbackWithFullResistance() {
 		KnockbackFeature kbFeature = CombatFeatures.modernVanilla().get(FeatureType.KNOCKBACK);
-		net.minestom.server.instance.InstanceContainer instance = net.minestom.server.MinecraftServer.getInstanceManager().createInstanceContainer();
+		assertTrue(kbFeature instanceof VanillaKnockbackFeature);
+		var instance = net.minestom.server.MinecraftServer.getInstanceManager().createInstanceContainer();
 		
 		LivingEntity attacker = new GroundedEntity(EntityType.ZOMBIE);
-		attacker.setInstance(instance, new Pos(0, 0, 0, 0, 0)).join(); // yaw = 0
+		attacker.setInstance(instance, new Pos(0, 0, 0, 0, 0)).join();
+		Damage damage = new Damage(DamageType.PLAYER_ATTACK, attacker, attacker, null, 5.0f);
 		
-		// Test attack knockback
-		GroundedEntity targetAttack = new GroundedEntity(EntityType.ZOMBIE);
-		targetAttack.setInstance(instance, new Pos(0, 0, 1)).join();
-		targetAttack.setOnGround(true);
-		targetAttack.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
-		targetAttack.setVelocity(Vec.ZERO);
+		GroundedEntity full = grounded(instance, new Pos(1, 0, 0), 1.0);
+		assertFalse(kbFeature.applyDamageKnockback(damage, full), "No knockback must be applied at full resistance");
+		assertEquals(Vec.ZERO, full.getVelocity());
 		
-		boolean attackApplied = kbFeature.applyAttackKnockback(attacker, targetAttack, 1);
-		assertTrue(attackApplied);
-		Vec attackVel = targetAttack.getVelocity();
-		assertEquals(0.0, attackVel.x(), 1e-6, "Attack knockback horizontal X must be 0 with kbResistance = 1.0");
-		assertEquals(0.0, attackVel.z(), 1e-6, "Attack knockback horizontal Z must be 0 with kbResistance = 1.0");
-		assertTrue(attackVel.y() > 0.0, "Attack knockback vertical must be > 0 with kbResistance = 1.0");
+		GroundedEntity attackTarget = grounded(instance, new Pos(0, 0, 1), 1.0);
+		assertFalse(kbFeature.applyAttackKnockback(attacker, attackTarget, 1));
+		assertEquals(Vec.ZERO, attackTarget.getVelocity());
 		
-		// Test sweeping knockback
-		GroundedEntity targetSweep = new GroundedEntity(EntityType.ZOMBIE);
-		targetSweep.setInstance(instance, new Pos(0, 0, 1)).join();
-		targetSweep.setOnGround(true);
-		targetSweep.getAttribute(Attribute.KNOCKBACK_RESISTANCE).setBaseValue(1.0);
-		targetSweep.setVelocity(Vec.ZERO);
+		GroundedEntity sweepTarget = grounded(instance, new Pos(0, 0, 1), 1.0);
+		assertFalse(kbFeature.applySweepingKnockback(attacker, sweepTarget));
+		assertEquals(Vec.ZERO, sweepTarget.getVelocity());
+	}
+	
+	@Test
+	@DisplayName("Vanilla: partial kbResistance scales both horizontal and vertical knockback")
+	void testKnockbackWithPartialResistance() {
+		KnockbackFeature kbFeature = CombatFeatures.modernVanilla().get(FeatureType.KNOCKBACK);
+		var instance = net.minestom.server.MinecraftServer.getInstanceManager().createInstanceContainer();
 		
-		boolean sweepApplied = kbFeature.applySweepingKnockback(attacker, targetSweep);
-		assertTrue(sweepApplied);
-		Vec sweepVel = targetSweep.getVelocity();
-		assertEquals(0.0, sweepVel.x(), 1e-6, "Sweeping knockback horizontal X must be 0 with kbResistance = 1.0");
-		assertEquals(0.0, sweepVel.z(), 1e-6, "Sweeping knockback horizontal Z must be 0 with kbResistance = 1.0");
-		assertTrue(sweepVel.y() > 0.0, "Sweeping knockback vertical must be > 0 with kbResistance = 1.0");
+		LivingEntity attacker = new GroundedEntity(EntityType.ZOMBIE);
+		attacker.setInstance(instance, new Pos(0, 0, 0, 0, 0)).join();
+		Damage damage = new Damage(DamageType.PLAYER_ATTACK, attacker, attacker, null, 5.0f);
+		
+		GroundedEntity none = grounded(instance, new Pos(1, 0, 0), 0.0);
+		GroundedEntity half = grounded(instance, new Pos(1, 0, 0), 0.5);
+		assertTrue(kbFeature.applyDamageKnockback(damage, none));
+		assertTrue(kbFeature.applyDamageKnockback(damage, half));
+		
+		assertEquals(none.getVelocity().y() * 0.5, half.getVelocity().y(), 1e-6, "Vertical knockback must be scaled by 1 - resistance");
+		assertEquals(Math.abs(none.getVelocity().x()) * 0.5, Math.abs(half.getVelocity().x()), 1e-6, "Horizontal knockback must be scaled by 1 - resistance");
 	}
 }

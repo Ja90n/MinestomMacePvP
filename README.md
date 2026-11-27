@@ -2,7 +2,7 @@
 
 Een volledige Minecraft PvP en Combat implementatie voor [Minestom](https://github.com/Minestom/Minestom), geüpdatet naar de nieuwste Minestom versie (`2026.10.07-26.2`) met volledige ondersteuning voor **Minecraft 1.21 features** (zoals de Mace, Speren, Wind Charges) en 100% vanilla combat parity.
 
-Bekijk het volledige, gedetailleerde overzicht van alle stappen en fixes in het [CHANGELOG.md](file:///home/jadon/Documents/MinestomMacePvP/CHANGELOG.md).
+Bekijk het volledige, gedetailleerde overzicht van alle stappen en fixes in het [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -49,4 +49,4 @@ Voer de volledige unit test suite uit (49 tests):
 ## Documentatie & Wijzigingen
 
 Voor een overzicht van elke afzonderlijke wijziging, zie:
-- [CHANGELOG.md](file:///home/jadon/Documents/MinestomMacePvP/CHANGELOG.md)
+- [CHANGELOG.md](CHANGELOG.md)

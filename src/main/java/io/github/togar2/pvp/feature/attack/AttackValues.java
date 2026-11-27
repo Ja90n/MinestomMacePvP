@@ -32,7 +32,17 @@ public class AttackValues {
 	                    int fireAspect, boolean sweeping, boolean sounds,
 	                    boolean playSoundsOnFail,
 	                    boolean maceSmash, boolean spear, double fallDistance,
-	                    float kineticDamage, boolean dismountTarget) {
+	                    float kineticDamage, boolean dismountTarget,
+	                    float sweepDamage, double cooldownProgress) {
+		public Final(float damage, boolean strong, boolean sprint,
+		             int knockback, boolean critical, boolean magical,
+		             int fireAspect, boolean sweeping, boolean sounds,
+		             boolean playSoundsOnFail,
+		             boolean maceSmash, boolean spear, double fallDistance,
+		             float kineticDamage, boolean dismountTarget) {
+			this(damage, strong, sprint, knockback, critical, magical, fireAspect, sweeping, sounds, playSoundsOnFail, maceSmash, spear, fallDistance, kineticDamage, dismountTarget, damage, 1.0);
+		}
+		
 		public Final(float damage, boolean strong, boolean sprint,
 		             int knockback, boolean critical, boolean magical,
 		             int fireAspect, boolean sweeping, boolean sounds,

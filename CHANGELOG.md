@@ -11,6 +11,7 @@ Dit document beschrijft in detail alle aanpassingen, stappen en verbeteringen di
 4. [Stap 4: Paard Dismount & Lighting Engine](#stap-4-paard-dismount--lighting-engine)
 5. [Stap 5: Categorie B Parity Discrepancies & Bugfixes](#stap-5-categorie-b-parity-discrepancies--bugfixes)
 6. [Stap 6: Uitgebreide Unit Test Suite](#stap-6-uitgebreide-unit-test-suite)
+7. [Stap 7: Attribute swapping & vanilla parity audit](#stap-7-attribute-swapping--vanilla-parity-audit)
 
 ---
 
@@ -36,7 +37,7 @@ Dit document beschrijft in detail alle aanpassingen, stappen en verbeteringen di
 - **Dismounting:** Treft rijdende spelers en haalt hen van hun rijdier af bij een succesvolle speerhit.
 
 ### 3. Wind Charges
-- Geïmplementeerd in [`src/main/java/io/github/togar2/pvp/entity/projectile/WindCharge.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/entity/projectile/WindCharge.java).
+- Geïmplementeerd in [`src/main/java/io/github/togar2/pvp/entity/projectile/WindCharge.java`](src/main/java/io/github/togar2/pvp/entity/projectile/WindCharge.java).
 - **Wind Charge Jump:** Schieten onder je eigen voeten lanceert de speler verticaal omhoog (~$26$ blokken/sec) en reset valschade.
 - **Ontploffing & Knockback:** Omringende entiteiten worden weggestoten op basis van afstand en `Attribute.KNOCKBACK_RESISTANCE`.
 - Geluiden (`ENTITY_WIND_CHARGE_THROW`, `ENTITY_WIND_CHARGE_WIND_BURST`) en gust particles toegevoegd.
@@ -47,7 +48,7 @@ Dit document beschrijft in detail alle aanpassingen, stappen en verbeteringen di
 ---
 
 ## Stap 3: Interactieve Testserver (PvpServer)
-- Geïmplementeerd in [`src/test/java/io/github/togar2/pvp/test/PvpServer.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/PvpServer.java).
+- Geïmplementeerd in [`src/test/java/io/github/togar2/pvp/test/PvpServer.java`](src/test/java/io/github/togar2/pvp/test/PvpServer.java).
 - **Interactieve Kit Selectie GUI:** Spelers kunnen wapens (Mace, Diamond Sword, Spear, Netherite Axe, Bow, Crossbow, Wind Charges, Ender Pearls, Shield) en armor sets (Netherite, Diamond, Iron) kiezen.
 - **Modusselectie:**
   - Vechten tegen een interactieve **NPC Dummy** (met configureerbare armor en knockback).
@@ -120,17 +121,17 @@ In deze stap zijn alle 8 geïdentificeerde Categorie B vanilla combat bugs aange
 ---
 
 ## Stap 6: Uitgebreide Unit Test Suite
-Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test/java/io/github/togar2/pvp/test/`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/):
-- [`CategoryBFixesTest.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/CategoryBFixesTest.java):
+Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test/java/io/github/togar2/pvp/test/`](src/test/java/io/github/togar2/pvp/test/):
+- [`CategoryBFixesTest.java`](src/test/java/io/github/togar2/pvp/test/CategoryBFixesTest.java):
   - `testShieldPitchIndependence()`
   - `testShieldWarmupDelay()`
   - `testArmorDurabilityDegradation()`
   - `testMaceFallDamageResetOnShieldBlock()`
   - `testWindChargeKnockbackResistance()`
   - `testEndCrystalDaisyChainAndAttribution()`
-- [`CriticalHitTest.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/CriticalHitTest.java):
+- [`CriticalHitTest.java`](src/test/java/io/github/togar2/pvp/test/CriticalHitTest.java):
   - `testElytraPreventsCrit()`
-- [`DamageTypeInfoTest.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/DamageTypeInfoTest.java):
+- [`DamageTypeInfoTest.java`](src/test/java/io/github/togar2/pvp/test/DamageTypeInfoTest.java):
   - `testUnblockableTypes()`
 - **Resultaat:** **45 / 45 tests succesvol geslaagd (`BUILD SUCCESSFUL`).**
 
@@ -141,15 +142,15 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
   - Vliegen met de Elytra (door in de lucht op spatie/jump te drukken) wordt door Minestom ondersteund via `START_FLYING_ELYTRA` en `setFlyingWithElytra(true)`.
   - Landen op de grond beëindigt het zweven automatisch via `refreshOnGround(true)` en roept `PlayerStopFlyingWithElytraEvent` aan.
   - Vliegen met Elytra voorkomt kritieke slagen (`VanillaCriticalFeature`).
-- **Firework Rocket Boost ([`VanillaFireworkRocketFeature.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/feature/projectile/VanillaFireworkRocketFeature.java) & [`FireworkRocketEntity.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/entity/projectile/FireworkRocketEntity.java))**:
+- **Firework Rocket Boost ([`VanillaFireworkRocketFeature.java`](src/main/java/io/github/togar2/pvp/feature/projectile/VanillaFireworkRocketFeature.java) & [`FireworkRocketEntity.java`](src/main/java/io/github/togar2/pvp/entity/projectile/FireworkRocketEntity.java))**:
   - `PlayerUseItemEvent` luistert naar het afschieten van vuurwerkraketten tijdens het vliegen met een Elytra.
   - De speler ontvangt een opwaartse/voorwaartse stuwkracht in de kijkrichting (`boostSpeed`), gesynchroniseerd via `sendImmediateVelocityUpdate()`.
   - De vuurwerkraket hecht zich aan de vliegende speler (`meta.setShooter(player)`), produceert deeltjes en geluid (`ENTITY_FIREWORK_ROCKET_LAUNCH`), en versnelt de speler gedurende zijn levensduur.
-- **Armor Selectie Menu ([`PvpServer.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/PvpServer.java))**:
+- **Armor Selectie Menu ([`PvpServer.java`](src/test/java/io/github/togar2/pvp/test/PvpServer.java))**:
   - In het Armor Menu (Slot 15) is de optie **Elytra Kit** toegevoegd: trekt direct een Elytra aan op de borst (aangevuld met Netherite helm, broek en laarzen) en geeft de speler 64x Firework Rockets in de inventory.
-- **Wapen Selectie Menu Fix ([`PvpServer.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/PvpServer.java))**:
+- **Wapen Selectie Menu Fix ([`PvpServer.java`](src/test/java/io/github/togar2/pvp/test/PvpServer.java))**:
   - `mat.name()` retourneert in Minestom de lowercase sleutel (`"minecraft:netherite_spear"`). De controle gebruikte voorheen `contains("SPEAR")` (hoofdletters), waardoor klikken op speren niet geregistreerd werd. Dit is opgelost met `mat.name().toLowerCase().contains("spear")`.
-- **Armor Equip Sound NPE Fix ([`ArmorMaterial.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/enums/ArmorMaterial.java) & [`PvpServer.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/PvpServer.java))**:
+- **Armor Equip Sound NPE Fix ([`ArmorMaterial.java`](src/main/java/io/github/togar2/pvp/enums/ArmorMaterial.java) & [`PvpServer.java`](src/test/java/io/github/togar2/pvp/test/PvpServer.java))**:
   - Null-check toegevoegd op `entity.getInstance()` in `ArmorMaterial.java` voordat het aantrekgeluid wordt afgespeeld.
   - In `PvpServer.java` wordt `setInstance` nu voltooid voordat armor wordt toebedeeld aan gespawnde dummy's en NPCs.
 
@@ -160,11 +161,11 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
   1. **`hasEntityCollision()` was `false` in Minestom:** `CustomEntityProjectile` initialiseerde `collidesWithEntities = false`. In Minestom's interne physics loop (`EntityCollision.checkCollision`) stond letterlijk: `if (!e.hasEntityCollision()) continue;`. Hierdoor negeerde de physics engine alle gegooide projectielen compleet en werd er nooit een botsing gedetecteerd.
   2. **Discrete Ticks & Snelheidsverschil:** Een Ender Pearl ($35$ b/s) en Wind Charge ($50$ b/s) verplaatsen zich $1.5$ tot $2.5$ blok per tick en hebben kleine hitboxes ($0.25$ blok). Discrete swept checks tegen statische posities misten elkaar wanneer de wind charge de pearl in dezelfde tick inhaalde.
   3. **Volgorde van Explosiekracht:** In `WindCharge.explode()` werd de radiale opwaartse stuwkracht uitgevoerd vóórdat de speler geteleporteerd was. Hierdoor stond de speler nog op de grond en ontving geen opwaartse boost in de lucht.
-- **Oplossing ([`WindCharge.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/entity/projectile/WindCharge.java) & [`ThrownEnderpearl.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/entity/projectile/ThrownEnderpearl.java))**:
+- **Oplossing ([`WindCharge.java`](src/main/java/io/github/togar2/pvp/entity/projectile/WindCharge.java) & [`ThrownEnderpearl.java`](src/main/java/io/github/togar2/pvp/entity/projectile/ThrownEnderpearl.java))**:
   - `hasEntityCollision()` geactiveerd (`return true`) op zowel `WindCharge` als `ThrownEnderpearl`.
   - **Continue Lijnsegment-Interceptie (`checkPearlInterception` & `checkWindChargeInterception`)**: Tijdens elke tick wordt de gevlogen baan van de wind charge als 3D-lijnsegment vergeleken met de positie en het baan-segment van vliegende ender pearls. Wanneer ze elkaar binnen $1.5$ blok passeren, onderschept de wind charge de pearl direct in de lucht.
   - **Teleportatie Vóór Explosiekracht:** In `WindCharge.explode()` wordt de eigenaar van de pearl nu direct als allereerste stap naar het botsingspunt in de lucht geteleporteerd. Vervolgens vangt de speler direct de opwaartse `LAUNCH_UPWARD_POWER` wind burst, wordt valschade gereset, en wordt de speler omhoog gelanceerd voor de iconische 1.21 IPC combo.
-- **Geverifieerd:** Twee gerichte unit tests in [`EnderpearlTest.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/EnderpearlTest.java):
+- **Geverifieerd:** Twee gerichte unit tests in [`EnderpearlTest.java`](src/test/java/io/github/togar2/pvp/test/EnderpearlTest.java):
   - `testInstantPearlCatch`: directe botsing en mid-air teleportatie.
   - `testInFlightProjectileInterception`: actieve in-flight onderschepping van een vliegende pearl door een achteropkomende wind charge, inclusief teleportatie en opwaartse stuwkracht ($> 10$ b/s).
   - Alle **49 unit tests** slagen foutloos (`./gradlew test --rerun`).
@@ -178,7 +179,7 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
   3. **Vaste Grondwrijving door $Y=0$:** De stootrichting werd geforceerd op `withY(0)`. Wanneer een speler op de grond stond met $Y=0$, zorgde de grondwrijving (`0.546`) ervoor dat de speler na een fractie van een blok stilstond.
 - **Oplossing:**
   - **`VanillaAttackCooldownFeature`:** `PREVIOUS_ATTACKED_TICKS` toegevoegd. Wanneer `resetCooldownProgress` in dezelfde tick wordt aangeroepen als een aanval, berekent `getAttackCooldownProgress` de werkelijke cooldown vóór de klik. Speeraanvallen worden niet langer per ongeluk geannuleerd.
-  - **Lucht-Jabs & Rechterklik Lunge ([`VanillaAttackFeature.java`](file:///home/jadon/Documents/MinestomMacePvP/src/main/java/io/github/togar2/pvp/feature/attack/VanillaAttackFeature.java))**:
+  - **Lucht-Jabs & Rechterklik Lunge ([`VanillaAttackFeature.java`](src/main/java/io/github/togar2/pvp/feature/attack/VanillaAttackFeature.java))**:
     - `PlayerHandAnimationEvent` en `PlayerUseItemEvent` listeners toegevoegd die `handleSpearLungeAction` aanroepen.
     - Speer-jab en lunge worden nu correct uitgevoerd bij zowel aanvallen op doelwitten als stoten in de lucht!
     - `LAST_LUNGE_TICK` tag toegevoegd om dubbele lunges binnen dezelfde tick te voorkomen.
@@ -188,7 +189,7 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
     - `fallFeature.resetFallDistance(attacker)` toegevoegd om valschade te voorkomen bij het lungeren.
     - Directe netwerksynchronisatie via `sendImmediateVelocityUpdate()` en geluidseffecten (`ITEM_SPEAR_LUNGE_1/2/3`).
     - Uitputting ($4.0 \times \text{level}$) en duurzaamheidsschade ($1$) worden correct toegepast.
-- **Geverifieerd:** Twee nieuwe tests toegevoegd aan [`SpearKineticTest.java`](file:///home/jadon/Documents/MinestomMacePvP/src/test/java/io/github/togar2/pvp/test/SpearKineticTest.java):
+- **Geverifieerd:** Twee nieuwe tests toegevoegd aan [`SpearKineticTest.java`](src/test/java/io/github/togar2/pvp/test/SpearKineticTest.java):
   - `testSpearLungeSwingInAir`: controleert voorwaartse impuls ($> 20$ b/s) bij stoten in de lucht.
   - `testSpearLungeOnEntityAttack`: controleert succesvolle aanval en voorwaartse lunge bij het raken van een entiteit.
   - Alle **48 unit tests** slagen foutloos (`./gradlew test --rerun`).
@@ -196,3 +197,19 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
 
 
 
+
+
+---
+
+## Stap 7: Attribute swapping & vanilla parity audit
+- **Attribute swapping:** vanilla past equipment-attributes (attack damage, attack speed, armor, ...) pas aan het einde van de tick toe en
+  reset de attack-cooldown pas in `Player#tick` bij een ander itemtype. Een hotbar-wissel en aanval in dezelfde tick gebruikt dus de attributen
+  van het oude item, en de speciale effecten (mace smash, enchants, bijl-schildbreker) van het nieuwe item.
+  - `VanillaEquipmentFeature` synchroniseert nu per tick (`syncEquipment`); `CombatPlayerImpl` onderdrukt de directe toepassing van Minestom.
+  - `VanillaAttackCooldownFeature` reset de cooldown per tick bij een ander itemtype en niet meer bij een gemiste zwaai.
+  - Items met een expliciete `ATTRIBUTE_MODIFIERS` component vervangen de default-modifiers (ook een lege lijst) en worden correct toegepast.
+- **Knockback resistance:** schaalt nu zowel horizontale als verticale knockback; bij 1.0 is er geen knockback. De aanvaller wordt ook vertraagd als het doelwit alles weerstaat.
+- **Sweeping:** basisschade is de schade na cooldown + mace-bonus (zonder crit/enchants), enchant-schade wordt per doelwit toegevoegd en alles wordt met de cooldown vermenigvuldigd.
+- **Mace smash:** AoE-knockback `(3.5 - d) * 0.7 * (valafstand > 5 ? 2 : 1) * (1 - resistance)`, vaste y-push 0.7, aanvaller y-velocity 0.01, lucht-geluid als het doelwit niet op de grond staat.
+- **Aanvalsbereik:** afstand van oog tot bounding box van het doelwit, `interaction range + 1.0` (was voet-tot-oog `+ 3.0`).
+- **Niet geverifieerd tegen de vanilla-jar:** Wind Burst (vanilla gebruikt een explosie in plaats van een vaste opwaartse snelheid) en de spear/kinetic-formules.

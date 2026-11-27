@@ -74,18 +74,21 @@ public class VanillaKnockbackFeature implements KnockbackFeature {
 		double dx = Math.sin(Math.toRadians(attacker.getPosition().yaw()));
 		double dz = -Math.cos(Math.toRadians(attacker.getPosition().yaw()));
 		
-		if (!applyKnockback(
+		boolean applied = applyKnockback(
 				target, attacker, attacker,
 				EntityKnockbackEvent.KnockbackType.ATTACK, knockback,
 				dx, dz, version.legacy()
-		)) return false;
+		);
+		// In vanilla the attacker is slowed down and stops sprinting whenever the attack has knockback,
+		// even if the target resisted all of it
+		if (!applied && target.getAttributeValue(Attribute.KNOCKBACK_RESISTANCE) < 1.0) return false;
 		
 		// If not legacy, attacker velocity is reduced after the knockback
 		if (version.modern() && attacker instanceof CombatPlayer custom)
 			custom.afterSprintAttack();
 		
 		attacker.setSprinting(false);
-		return true;
+		return applied;
 	}
 	
 	@Override
@@ -136,8 +139,11 @@ public class VanillaKnockbackFeature implements KnockbackFeature {
 			vertical = baseVertical * extraKnockback;
 		}
 		
-		horizontal *= (1 - kbResistance);
-		if (horizontal < 0) horizontal = 0;
+		// Vanilla (LivingEntity#knockback) scales the whole strength, which is used for both the horizontal
+		// and the vertical component, with the knockback resistance. Nothing happens when it reaches zero.
+		double resistanceFactor = Math.max(0, 1 - kbResistance);
+		horizontal *= resistanceFactor;
+		vertical *= resistanceFactor;
 		if (horizontal <= 0 && vertical <= 0) return null;
 		
 		Vec horizontalModifier = horizontal <= 0 ? Vec.ZERO : new Vec(dx, dz).normalize().mul(horizontal);
