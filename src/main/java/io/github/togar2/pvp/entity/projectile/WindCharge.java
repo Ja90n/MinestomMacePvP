@@ -31,6 +31,7 @@ public class WindCharge extends CustomEntityProjectile {
 	public static final float KNOCKBACK_MULTIPLIER = 1.22f;
 	/** Generous radius used for catching ender pearls (instant pearl catch) */
 	private static final double PEARL_CATCH_RADIUS = 3.5;
+	private static final int NO_DEFLECT_TICKS = 5;
 	
 	private final FallFeature fallFeature;
 	private boolean exploded = false;
@@ -100,6 +101,19 @@ public class WindCharge extends CustomEntityProjectile {
 		return p.sub(projection).length();
 	}
 
+	/**
+	 * Vanilla {@code ProjectileDeflection#AIM_DEFLECT}: hitting a wind charge redirects it in the look direction
+	 * of the attacker and makes the attacker its owner. A fresh wind charge cannot be deflected for 5 ticks.
+	 *
+	 * @return whether the wind charge was deflected
+	 */
+	public boolean deflect(Entity deflector) {
+		if (exploded || isRemoved() || getAliveTicks() < NO_DEFLECT_TICKS) return false;
+		setShooter(deflector);
+		setVelocity(deflector.getPosition().direction().mul(ServerFlag.SERVER_TICKS_PER_SECOND));
+		return true;
+	}
+	
 	@Override
 	public boolean onHit(Entity entity) {
 		explode(getPosition(), entity);

@@ -64,7 +64,7 @@ public class VanillaKnockbackFeature implements KnockbackFeature {
 	}
 	
 	@Override
-	public boolean applyAttackKnockback(LivingEntity attacker, LivingEntity target, int knockback) {
+	public boolean applyAttackKnockback(LivingEntity attacker, LivingEntity target, double knockback) {
 		if (knockback <= 0) return false;
 		
 		// If legacy, attacker velocity is reduced before the knockback
@@ -110,7 +110,7 @@ public class VanillaKnockbackFeature implements KnockbackFeature {
 	) {}
 	
 	protected @Nullable KnockbackValues prepareKnockback(LivingEntity target, Entity attacker, @Nullable Entity source,
-	                                                     EntityKnockbackEvent.KnockbackType type, int extraKnockback,
+	                                                     EntityKnockbackEvent.KnockbackType type, double extraKnockback,
 	                                                     double dx, double dz, boolean legacy) {
 		var animationType = legacy
 				? EntityKnockbackEvent.AnimationType.FIXED
@@ -151,7 +151,7 @@ public class VanillaKnockbackFeature implements KnockbackFeature {
 	}
 	
 	protected boolean applyKnockback(LivingEntity target, Entity attacker, @Nullable Entity source,
-	                                 EntityKnockbackEvent.KnockbackType type, int extraKnockback,
+	                                 EntityKnockbackEvent.KnockbackType type, double extraKnockback,
 	                                 double dx, double dz, boolean legacy) {
 		KnockbackValues values = prepareKnockback(target, attacker, source, type, extraKnockback, dx, dz, legacy);
 		if (values == null) return false;

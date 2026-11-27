@@ -11,6 +11,7 @@ import io.github.togar2.pvp.player.CombatPlayer;
 import io.github.togar2.pvp.utils.FluidUtil;
 import io.github.togar2.pvp.utils.KnownMovement;
 import io.github.togar2.pvp.utils.RayUtil;
+import io.github.togar2.pvp.utils.TeamUtil;
 import io.github.togar2.pvp.utils.ViewUtil;
 import net.kyori.adventure.sound.Sound;
 import net.minestom.server.ServerFlag;
@@ -205,7 +206,7 @@ final class VanillaSpearAttacks {
 			// causeExtraKnockback(0.4) followed by causeExtraKnockback(enchantment knockback)
 			knockbackFeature.applySweepingKnockback(attacker, livingTarget);
 			slowAttacker(attacker);
-			int extra = enchantmentFeature.getKnockback(attacker) + (int) attacker.getAttributeValue(Attribute.ATTACK_KNOCKBACK);
+			double extra = enchantmentFeature.getKnockback(attacker) + attacker.getAttributeValue(Attribute.ATTACK_KNOCKBACK);
 			if (extra > 0) knockbackFeature.applyAttackKnockback(attacker, livingTarget, extra);
 			if (target instanceof CombatPlayer custom) custom.sendImmediateVelocityUpdate();
 		}
@@ -319,6 +320,8 @@ final class VanillaSpearAttacks {
 		while (jabberRoot.getVehicle() != null) jabberRoot = jabberRoot.getVehicle();
 		Entity targetRoot = target;
 		while (targetRoot.getVehicle() != null) targetRoot = targetRoot.getVehicle();
+		if (jabber instanceof Player jabbingPlayer && target instanceof Player targetPlayer
+				&& !TeamUtil.canHarmPlayer(jabbingPlayer, targetPlayer)) return false;
 		return jabberRoot != targetRoot;
 	}
 	

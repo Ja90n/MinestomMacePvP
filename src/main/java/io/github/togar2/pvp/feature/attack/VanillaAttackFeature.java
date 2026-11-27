@@ -1,6 +1,7 @@
 package io.github.togar2.pvp.feature.attack;
 
 import io.github.togar2.pvp.enchantment.EntityGroup;
+import io.github.togar2.pvp.entity.projectile.WindCharge;
 import io.github.togar2.pvp.enums.Tool;
 import io.github.togar2.pvp.events.FinalAttackEvent;
 import io.github.togar2.pvp.events.PrepareAttackEvent;
@@ -19,6 +20,7 @@ import io.github.togar2.pvp.utils.CombatVersion;
 import io.github.togar2.pvp.utils.ExplosionKnockback;
 import io.github.togar2.pvp.utils.FluidUtil;
 import io.github.togar2.pvp.utils.KnownMovement;
+import io.github.togar2.pvp.utils.TeamUtil;
 import io.github.togar2.pvp.utils.ViewUtil;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.sound.Sound;
@@ -148,6 +150,13 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 	public boolean performAttack(LivingEntity attacker, Entity target) {
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());
 
+		// Redirectable projectiles (wind charges) are deflected by hitting them
+		if (target instanceof WindCharge windCharge && windCharge.deflect(attacker)) {
+			ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
+				SoundEvent.ENTITY_PLAYER_ATTACK_NODAMAGE, Sound.Source.PLAYER, 1.0f, 1.0f), attacker);
+			return false;
+		}
+		
 		PrepareAttackEvent prepareAttackEvent = new PrepareAttackEvent(attacker, target);
 		EventDispatcher.call(prepareAttackEvent);
 		if (prepareAttackEvent.isCancelled()) return false;
@@ -227,6 +236,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 				for (Entity nearby : target.getInstance().getNearbyEntities(targetPos, 3.5)) {
 					if (nearby == target || nearby == attacker) continue;
 					if (!(nearby instanceof LivingEntity livingNearby)) continue;
+					if (TeamUtil.isAllied(attacker, nearby)) continue;
 					if (nearby instanceof Player p && (p.getGameMode() == GameMode.SPECTATOR
 							|| (p.getGameMode() == GameMode.CREATIVE && p.isFlying()))) continue;
 					if (nearby.getEntityMeta() instanceof net.minestom.server.entity.metadata.other.ArmorStandMeta stand
@@ -387,7 +397,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		// Calculate attacks
 		boolean strongAttack = cooldownProgress > 0.9;
 		boolean sprintAttack = attacker.isSprinting() && strongAttack;
-		int knockback = enchantmentFeature.getKnockback(attacker) + (int) attacker.getAttributeValue(Attribute.ATTACK_KNOCKBACK);
+		double knockback = enchantmentFeature.getKnockback(attacker) + attacker.getAttributeValue(Attribute.ATTACK_KNOCKBACK);
 		int fireAspect = enchantmentFeature.getFireAspect(attacker);
 
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());

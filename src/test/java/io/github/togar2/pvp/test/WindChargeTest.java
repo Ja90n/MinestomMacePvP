@@ -103,4 +103,45 @@ public class WindChargeTest {
 		io.github.togar2.pvp.utils.ExplosionKnockback.apply(instance, new Pos(68.5, 10.5, 60.5), 3.5f, 2.2f, null, null, null);
 		assertEquals(0.0, shielded.getVelocity().length(), 1e-6, "Entities behind solid blocks must not be pushed");
 	}
+	
+	@Test
+	@DisplayName("Hitting a wind charge deflects it in the look direction and changes its owner, but not in its first 5 ticks")
+	public void testWindChargeDeflection() {
+		Player deflector = TestEnvironment.createPlayer(instance, new Pos(90, 10, 90, 90, 0)); // looking towards -x
+		Player shooter = TestEnvironment.createPlayer(instance, new Pos(95, 10, 95));
+		WindCharge windCharge = new WindCharge(shooter, fallFeature);
+		windCharge.setInstance(instance, new Pos(88, 11, 90)).join();
+		
+		assertFalse(windCharge.deflect(deflector), "A fresh wind charge cannot be deflected");
+		
+		try {
+			var field = net.minestom.server.entity.Entity.class.getDeclaredField("ticks");
+			field.setAccessible(true);
+			field.setLong(windCharge, 10);
+		} catch (ReflectiveOperationException e) {
+			// Fall back to the real tick counter below
+			for (int i = 0; i < 6; i++) windCharge.tick(i);
+		}
+		if (windCharge.getAliveTicks() < 5) for (int i = 0; i < 6; i++) windCharge.update(i);
+		
+		assertTrue(windCharge.deflect(deflector));
+		assertSame(deflector, windCharge.getShooter(), "The deflector becomes the owner");
+		assertEquals(-20.0, windCharge.getVelocity().x(), 0.01, "Velocity is the look direction at 1 block per tick");
+	}
+	
+	@Test
+	@DisplayName("Players in the same team cannot hurt each other unless friendly fire is enabled")
+	public void testFriendlyFire() {
+		var team = net.minestom.server.MinecraftServer.getTeamManager().createTeam("pvp-test-team");
+		Player a = TestEnvironment.createPlayer(instance, new Pos(100, 10, 100));
+		Player b = TestEnvironment.createPlayer(instance, new Pos(101, 10, 100));
+		a.setTeam(team);
+		b.setTeam(team);
+		assertFalse(io.github.togar2.pvp.utils.TeamUtil.canHarmPlayer(a, b));
+		team.setAllowFriendlyFire(true);
+		assertTrue(io.github.togar2.pvp.utils.TeamUtil.canHarmPlayer(a, b));
+		team.setAllowFriendlyFire(false);
+		Player outsider = TestEnvironment.createPlayer(instance, new Pos(102, 10, 100));
+		assertTrue(io.github.togar2.pvp.utils.TeamUtil.canHarmPlayer(a, outsider));
+	}
 }

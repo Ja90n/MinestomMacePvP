@@ -3,6 +3,7 @@ package io.github.togar2.pvp.feature.attack;
 import io.github.togar2.pvp.enchantment.EntityGroup;
 import io.github.togar2.pvp.enums.Tool;
 import io.github.togar2.pvp.utils.KnownMovement;
+import io.github.togar2.pvp.utils.TeamUtil;
 import io.github.togar2.pvp.feature.FeatureType;
 import io.github.togar2.pvp.feature.config.DefinedFeature;
 import io.github.togar2.pvp.feature.config.FeatureConfiguration;
@@ -88,6 +89,7 @@ public class VanillaSweepingFeature implements SweepingFeature {
 		assert target.getInstance() != null;
 		for (Entity nearbyEntity : target.getInstance().getNearbyEntities(target.getPosition(), 2)) {
 			if (nearbyEntity == target || nearbyEntity == attacker) continue;
+			if (TeamUtil.isAllied(attacker, nearbyEntity)) continue;
 			if (!(nearbyEntity instanceof LivingEntity living)) continue;
 			if (nearbyEntity.getEntityType() == EntityType.ARMOR_STAND) continue;
 			if (!boundingBox.intersectEntity(target.getPosition(), nearbyEntity)) continue;

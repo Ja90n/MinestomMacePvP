@@ -17,6 +17,7 @@ import io.github.togar2.pvp.feature.totem.TotemFeature;
 import io.github.togar2.pvp.feature.tracking.TrackingFeature;
 import io.github.togar2.pvp.utils.CombatVersion;
 import io.github.togar2.pvp.utils.EntityUtil;
+import io.github.togar2.pvp.utils.TeamUtil;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.sound.Sound;
 import net.minestom.server.MinecraftServer;
@@ -100,6 +101,13 @@ public class VanillaDamageFeature implements DamageFeature, RegistrableFeature {
 		LivingEntity entity = event.getEntity();
 		Damage damage = event.getDamage();
 		Entity attacker = damage.getAttacker();
+		
+		// Vanilla Player#hurtServer: players cannot hurt teammates unless friendly fire is enabled
+		if (entity instanceof Player victim && attacker instanceof Player attackingPlayer
+				&& !TeamUtil.canHarmPlayer(attackingPlayer, victim)) {
+			event.setCancelled(true);
+			return;
+		}
 		
 		DamageType damageType = MinecraftServer.getDamageTypeRegistry().get(damage.getType());
 		assert damageType != null;

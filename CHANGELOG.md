@@ -227,4 +227,8 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
   - Stab-knockback: eerst 0.4, daarna de enchantment/attribuut-knockback; de aanvaller wordt vertraagd. Item-durability 1 per geraakt levend doelwit, uitputting 0.1.
   - **Lunge** alleen na een jab: impuls `look * (1,0,1) * 0.458 * level` (geen verticale component en geen reset van valschade), alleen zonder voertuig/elytra/water en met honger >= 7 (of creative); kost 1 durability en `4 * level` uitputting.
   - `KnownMovement` houdt per tick bij hoeveel een entiteit bewoog (vanilla `getKnownMovement`); sweeping gebruikt dat nu ook.
-- **Bekende resterende afwijkingen:** `ATTACK_KNOCKBACK` wordt naar een geheel getal afgerond (vanilla gebruikt een float), het terugkaatsen van projectielen bij een klap en `canHarmPlayer` (teams/pvp-uitzonderingen) bij speerhits zijn niet geimplementeerd.
+- **Resterende afwijkingen opgelost:**
+  - `ATTACK_KNOCKBACK` is nu een float (knockback-API en `AttackValues` gebruiken `double`), zoals vanilla `getKnockback`.
+  - Wind charges worden teruggekaatst door ze te slaan (`WindCharge#deflect`): kijkrichting als snelheid, de slaande entiteit wordt eigenaar, niet in de eerste 5 ticks.
+  - `TeamUtil` (vanilla `isAlliedTo` / `canHarmPlayer`): teamgenoten kunnen elkaar niet raken tenzij friendly fire aanstaat (`VanillaDamageFeature`, speerhits), en worden overgeslagen door sweeping en de mace-AoE.
+- **Nog bewust anders:** de kinetic-tick draait op `PlayerTickEvent` in plaats van op het exacte punt in vanilla's `LivingEntity#tick`; projectielen anders dan de wind charge (bijv. vuurballen) worden niet teruggekaatst omdat de lib die entiteiten niet zelf beheert.
