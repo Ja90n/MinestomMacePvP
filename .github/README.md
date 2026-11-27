@@ -34,7 +34,7 @@ The original project is published on [maven central](https://central.sonatype.co
 ## Installation
 
 The library is available through [JitPack](https://jitpack.io/#Ja90n/MinestomMacePvP).
-Use `master-SNAPSHOT` for the latest version, a release tag, or a commit hash as the version.
+Use a release tag as the version (the latest is `v1.0.0`), or `master-SNAPSHOT` / a commit hash for the latest development version.
 Minestom is not bundled, you have to add it to your project yourself (the library is built for `2026.10.07-26.2`).
 
 <details>
@@ -48,7 +48,7 @@ repositories {
 
 dependencies {
     implementation("net.minestom:minestom:2026.10.07-26.2")
-    implementation("com.github.Ja90n:MinestomMacePvP:master-SNAPSHOT")
+    implementation("com.github.Ja90n:MinestomMacePvP:v1.0.0")
 }
 ```
 </details>
@@ -64,7 +64,7 @@ repositories {
 
 dependencies {
     implementation 'net.minestom:minestom:2026.10.07-26.2'
-    implementation 'com.github.Ja90n:MinestomMacePvP:master-SNAPSHOT'
+    implementation 'com.github.Ja90n:MinestomMacePvP:v1.0.0'
 }
 ```
 </details>
@@ -89,7 +89,7 @@ dependencies {
   <dependency>
     <groupId>com.github.Ja90n</groupId>
     <artifactId>MinestomMacePvP</artifactId>
-    <version>master-SNAPSHOT</version>
+    <version>v1.0.0</version>
   </dependency>
 </dependencies>
 ```
