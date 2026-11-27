@@ -1,7 +1,7 @@
 package io.github.togar2.pvp.feature.attack;
 
 import io.github.togar2.pvp.enchantment.EntityGroup;
-import io.github.togar2.pvp.entity.projectile.WindCharge;
+import io.github.togar2.pvp.entity.projectile.Deflectable;
 import io.github.togar2.pvp.enums.Tool;
 import io.github.togar2.pvp.events.FinalAttackEvent;
 import io.github.togar2.pvp.events.PrepareAttackEvent;
@@ -151,7 +151,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());
 
 		// Redirectable projectiles (wind charges) are deflected by hitting them
-		if (target instanceof WindCharge windCharge && windCharge.deflect(attacker)) {
+		if (target instanceof Deflectable deflectable && deflectable.deflect(attacker)) {
 			ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
 				SoundEvent.ENTITY_PLAYER_ATTACK_NODAMAGE, Sound.Source.PLAYER, 1.0f, 1.0f), attacker);
 			return false;

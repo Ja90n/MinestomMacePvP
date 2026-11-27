@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Represents a thrown Wind Charge projectile (Minecraft 1.21).
  */
-public class WindCharge extends CustomEntityProjectile {
+public class WindCharge extends CustomEntityProjectile implements Deflectable {
 	/** Vanilla WindCharge#explode radius */
 	public static final double EXPLOSION_RADIUS = 1.2;
 	/** Knockback multiplier of the wind charge explosion damage calculator */
@@ -107,6 +107,7 @@ public class WindCharge extends CustomEntityProjectile {
 	 *
 	 * @return whether the wind charge was deflected
 	 */
+	@Override
 	public boolean deflect(Entity deflector) {
 		if (exploded || isRemoved() || getAliveTicks() < NO_DEFLECT_TICKS) return false;
 		setShooter(deflector);

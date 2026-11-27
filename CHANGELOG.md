@@ -231,4 +231,10 @@ Alle mechanieken worden automatisch geverifieerd via JUnit 5 tests in [`src/test
   - `ATTACK_KNOCKBACK` is nu een float (knockback-API en `AttackValues` gebruiken `double`), zoals vanilla `getKnockback`.
   - Wind charges worden teruggekaatst door ze te slaan (`WindCharge#deflect`): kijkrichting als snelheid, de slaande entiteit wordt eigenaar, niet in de eerste 5 ticks.
   - `TeamUtil` (vanilla `isAlliedTo` / `canHarmPlayer`): teamgenoten kunnen elkaar niet raken tenzij friendly fire aanstaat (`VanillaDamageFeature`, speerhits), en worden overgeslagen door sweeping en de mace-AoE.
-- **Nog bewust anders:** de kinetic-tick draait op `PlayerTickEvent` in plaats van op het exacte punt in vanilla's `LivingEntity#tick`; projectielen anders dan de wind charge (bijv. vuurballen) worden niet teruggekaatst omdat de lib die entiteiten niet zelf beheert.
+- **Vuurballen** (`HurtingProjectile`, `LargeFireball`, `SmallFireball`, gecontroleerd tegen `AbstractHurtingProjectile`, `LargeFireball`, `SmallFireball`):
+  - Versnellen elke tick met `movement = (movement + normalize(movement) * 0.1) * 0.95` (water: 0.8), startsnelheid is `richting * 0.1`.
+  - `LargeFireball`: 6 schade aan het geraakte doelwit en een explosie met `explosionPower` (met vuur, eigenaar als veroorzaker), zowel bij een entiteit als een blok.
+  - `SmallFireball`: 5 schade en 5 seconden brand (hersteld als de schade faalt), plaatst vuur (of zielenvuur) op een vaste ondergrond bij een blokhit.
+  - Starten met `fireball.launch(instance, positie, richting)`.
+  - Alle `Deflectable` projectielen (vuurballen en wind charges) kaatsen terug als je ze slaat (`AIM_DEFLECT`) en ook wanneer een ander projectiel ze raakt.
+- **Nog bewust anders:** de kinetic-tick draait op `PlayerTickEvent` in plaats van op het exacte punt in vanilla's `LivingEntity#tick`; fireballs raken elkaar niet onderling, en de lib spawnt zelf geen vuurballen (er zijn geen ghasts/blazes of dispensers), dus gebruik de `launch`-API.

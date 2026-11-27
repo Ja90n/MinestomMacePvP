@@ -198,7 +198,7 @@ public class CustomEntityProjectile extends Entity {
     }
 
     protected boolean canHit(Entity entity) {
-        return entity instanceof LivingEntity && !(entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR);
+        return entity instanceof Deflectable || entity instanceof LivingEntity && !(entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR);
     }
 
     @Override
@@ -252,6 +252,12 @@ public class CustomEntityProjectile extends Entity {
                     var event = new ProjectileCollideWithEntityEvent(this, collided.collisionPoint().asPos(), collided.entity());
                     EventDispatcher.call(event);
                     if (!event.isCancelled()) {
+                        if (collided.entity() instanceof Deflectable deflectable && !(this instanceof Deflectable)) {
+                            // Vanilla: projectiles hitting a redirectable projectile (fireball, wind charge) deflect it
+                            deflectable.deflect(shooter);
+                            scheduler().scheduleNextProcess(this::remove);
+                            return;
+                        }
                         if (onHit(collided.entity())) {
                             // Don't remove now because rest of Entity#tick might throw errors
                             scheduler().scheduleNextProcess(this::remove);
