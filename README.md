@@ -8,7 +8,7 @@ Bekijk het volledige, gedetailleerde overzicht van alle stappen en fixes in het 
 
 ## Installatie (JitPack)
 
-De bibliotheek is beschikbaar via [JitPack](https://jitpack.io/#Ja90n/MinestomMacePvP). Gebruik `master-SNAPSHOT` voor de nieuwste versie, een release tag of een commit hash. Minestom zelf zit er niet in, die voeg je zelf toe.
+De bibliotheek is beschikbaar via [JitPack](https://jitpack.io/#Ja90n/MinestomMacePvP). Gebruik een release tag (de nieuwste is `v1.0.0`), of `master-SNAPSHOT` / een commit hash voor de nieuwste ontwikkelversie. Minestom zelf zit er niet in, die voeg je zelf toe.
 
 **Gradle (Kotlin)**
 ```kts
@@ -19,7 +19,7 @@ repositories {
 
 dependencies {
     implementation("net.minestom:minestom:2026.10.07-26.2")
-    implementation("com.github.Ja90n:MinestomMacePvP:master-SNAPSHOT")
+    implementation("com.github.Ja90n:MinestomMacePvP:v1.0.0")
 }
 ```
 
@@ -32,7 +32,7 @@ repositories {
 
 dependencies {
     implementation 'net.minestom:minestom:2026.10.07-26.2'
-    implementation 'com.github.Ja90n:MinestomMacePvP:master-SNAPSHOT'
+    implementation 'com.github.Ja90n:MinestomMacePvP:v1.0.0'
 }
 ```
 
@@ -54,7 +54,7 @@ dependencies {
   <dependency>
     <groupId>com.github.Ja90n</groupId>
     <artifactId>MinestomMacePvP</artifactId>
-    <version>master-SNAPSHOT</version>
+    <version>v1.0.0</version>
   </dependency>
 </dependencies>
 ```
