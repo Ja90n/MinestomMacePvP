@@ -1,6 +1,7 @@
 package io.github.togar2.pvp.feature.attack;
 
 import io.github.togar2.pvp.enchantment.EntityGroup;
+import io.github.togar2.pvp.entity.projectile.Deflectable;
 import io.github.togar2.pvp.enums.Tool;
 import io.github.togar2.pvp.events.FinalAttackEvent;
 import io.github.togar2.pvp.events.PrepareAttackEvent;
@@ -16,7 +17,10 @@ import io.github.togar2.pvp.feature.item.ItemDamageFeature;
 import io.github.togar2.pvp.feature.knockback.KnockbackFeature;
 import io.github.togar2.pvp.player.CombatPlayer;
 import io.github.togar2.pvp.utils.CombatVersion;
+import io.github.togar2.pvp.utils.ExplosionKnockback;
 import io.github.togar2.pvp.utils.FluidUtil;
+import io.github.togar2.pvp.utils.KnownMovement;
+import io.github.togar2.pvp.utils.TeamUtil;
 import io.github.togar2.pvp.utils.ViewUtil;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.sound.Sound;
@@ -31,8 +35,10 @@ import net.minestom.server.entity.damage.DamageType;
 import net.minestom.server.event.EventDispatcher;
 import net.minestom.server.event.EventNode;
 import net.minestom.server.event.entity.EntityAttackEvent;
-import net.minestom.server.event.player.PlayerHandAnimationEvent;
-import net.minestom.server.event.player.PlayerUseItemEvent;
+import net.minestom.server.event.entity.EntityTickEvent;
+import net.minestom.server.event.item.PlayerBeginItemUseEvent;
+import net.minestom.server.event.player.PlayerStabEvent;
+import net.minestom.server.event.player.PlayerTickEvent;
 import net.minestom.server.event.trait.EntityInstanceEvent;
 import net.minestom.server.instance.block.Block;
 import net.minestom.server.item.ItemStack;
@@ -61,7 +67,11 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		FeatureType.FALL, FeatureType.VERSION
 	);
 
-	private static final double ATTACK_RANGE_MARGIN = 3.0;
+	/**
+	 * Server side tolerance on top of the entity interaction range
+	 * (vanilla: Player#isWithinEntityInteractionRange(aabb, 1.0)).
+	 */
+	private static final double ATTACK_RANGE_MARGIN = 1.0;
 
 	private final FeatureConfiguration configuration;
 
@@ -76,6 +86,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 	private FallFeature fallFeature;
 
 	private CombatVersion version;
+	private VanillaSpearAttacks spearAttacks;
 
 	public VanillaAttackFeature(FeatureConfiguration configuration) {
 		this.configuration = configuration;
@@ -92,62 +103,60 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		this.knockbackFeature = configuration.get(FeatureType.KNOCKBACK);
 		this.fallFeature = configuration.get(FeatureType.FALL);
 		this.version = configuration.get(FeatureType.VERSION);
+		this.spearAttacks = new VanillaSpearAttacks(cooldownFeature, exhaustionFeature, itemDamageFeature,
+				enchantmentFeature, knockbackFeature, fallFeature);
 	}
-
-	public static final Tag<Long> LAST_LUNGE_TICK = Tag.Long("lastLungeTick");
 
 	@Override
 	public void init(EventNode<EntityInstanceEvent> node) {
 		node.addListener(EntityAttackEvent.class, event -> {
 			if (event.getEntity() instanceof Player player && player.getGameMode() != GameMode.SPECTATOR && !player.isDead()) {
 				Entity target = event.getTarget();
-				double maxDistanceSquared = Math.pow(player.getAttributeValue(Attribute.ENTITY_INTERACTION_RANGE) + ATTACK_RANGE_MARGIN, 2);
-				if (player.getPosition().distanceSquared(target.getPosition().add(0, target.getEyeHeight(), 0)) < maxDistanceSquared)
-					performAttack(player, target);
+				// Vanilla ignores normal attacks with piercing weapons (spears), they jab using the stab action
+				if (VanillaSpearAttacks.isPiercing(player.getItemInMainHand())) return;
+				if (isWithinInteractionRange(player, target)) performAttack(player, target);
 			}
 		});
-
-		node.addListener(PlayerHandAnimationEvent.class, event -> {
-			Player player = event.getPlayer();
-			if (player.getGameMode() == GameMode.SPECTATOR || player.isDead()) return;
-			if (event.getHand() != PlayerHand.MAIN) return;
-
-			handleSpearLungeAction(player);
+		
+		// Spear jab (left click)
+		node.addListener(PlayerStabEvent.class, event -> spearAttacks.jab(event.getPlayer()));
+		
+		// Spear charge (hold right click)
+		node.addListener(PlayerBeginItemUseEvent.class, event -> {
+			if (event.getHand() == PlayerHand.MAIN) spearAttacks.startKinetic(event.getPlayer(), event.getItemStack());
 		});
-
-		node.addListener(PlayerUseItemEvent.class, event -> {
-			Player player = event.getPlayer();
-			if (player.getGameMode() == GameMode.SPECTATOR || player.isDead()) return;
-			if (event.getHand() != PlayerHand.MAIN) return;
-
-			handleSpearLungeAction(player);
-		});
+		node.addListener(PlayerTickEvent.class, event -> spearAttacks.tickKinetic(event.getPlayer()));
+		
+		node.addListener(EntityTickEvent.class, event -> KnownMovement.update(event.getEntity()));
 	}
-
-	private void handleSpearLungeAction(Player player) {
-		ItemStack stack = player.getItemInMainHand();
-		Tool tool = Tool.fromMaterial(stack.material());
-		if (tool != null && tool.isSpear()) {
-			int lunge = enchantmentFeature.getLunge(player);
-			if (lunge > 0) {
-				if (cooldownFeature.getAttackCooldownProgress(player) >= 0.95) {
-					if (performLunge(player, lunge)) {
-						cooldownFeature.resetCooldownProgress(player);
-					}
-				}
-			}
-		}
+	
+	/**
+	 * Vanilla range check: the distance between the eyes of the player and the closest point
+	 * of the bounding box of the target has to be smaller than interaction range + margin.
+	 */
+	protected boolean isWithinInteractionRange(Player player, Entity target) {
+		double range = player.getAttributeValue(Attribute.ENTITY_INTERACTION_RANGE) + ATTACK_RANGE_MARGIN;
+		Pos eye = player.getPosition().add(0, player.getEyeHeight(), 0);
+		Pos pos = target.getPosition();
+		var box = target.getBoundingBox();
+		double halfWidth = box.width() / 2, halfDepth = box.depth() / 2;
+		double dx = Math.max(Math.max(pos.x() - halfWidth - eye.x(), 0), eye.x() - (pos.x() + halfWidth));
+		double dy = Math.max(Math.max(pos.y() - eye.y(), 0), eye.y() - (pos.y() + box.height()));
+		double dz = Math.max(Math.max(pos.z() - halfDepth - eye.z(), 0), eye.z() - (pos.z() + halfDepth));
+		return dx * dx + dy * dy + dz * dz < range * range;
 	}
-
+	
 	@Override
 	public boolean performAttack(LivingEntity attacker, Entity target) {
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());
-		if (tool != null && tool.isSpear()) {
-			if (attacker instanceof Player player) {
-				if (cooldownFeature.getAttackCooldownProgress(player) < 0.95) return false;
-			}
-		}
 
+		// Redirectable projectiles (wind charges) are deflected by hitting them
+		if (target instanceof Deflectable deflectable && deflectable.deflect(attacker)) {
+			ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
+				SoundEvent.ENTITY_PLAYER_ATTACK_NODAMAGE, Sound.Source.PLAYER, 1.0f, 1.0f), attacker);
+			return false;
+		}
+		
 		PrepareAttackEvent prepareAttackEvent = new PrepareAttackEvent(attacker, target);
 		EventDispatcher.call(prepareAttackEvent);
 		if (prepareAttackEvent.isCancelled()) return false;
@@ -157,8 +166,6 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		RegistryKey<DamageType> damageType;
 		if (attack.maceSmash()) {
 			damageType = DamageType.MACE_SMASH;
-		} else if (attack.spear()) {
-			damageType = DamageType.SPEAR;
 		} else {
 			damageType = attacker instanceof Player ? DamageType.PLAYER_ATTACK : DamageType.MOB_ATTACK;
 		}
@@ -180,14 +187,15 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 				fallFeature.resetFallDistance(attacker);
 			}
 
-			if (tool != null) {
-				itemDamageFeature.damageEquipment(attacker, EquipmentSlot.MAIN_HAND,
-					(tool.isSword() || tool == Tool.TRIDENT || tool.isMace() || tool.isSpear()) ? 1 : 2);
+			// Vanilla only damages the item and adds exhaustion when the target was actually hurt
+			
+			// The sprint knockback sound is played before the damage is dealt
+			if (attack.sounds() && attack.sprint()) {
+				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
+					SoundEvent.ENTITY_PLAYER_ATTACK_KNOCKBACK, Sound.Source.PLAYER,
+					1.0f, 1.0f
+				), attacker);
 			}
-			if (attacker instanceof Player player) {
-				exhaustionFeature.addAttackExhaustion(player);
-			}
-
 			// No damage sound
 			if (attack.sounds() && attack.playSoundsOnFail()) {
 				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
@@ -205,7 +213,7 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		// Knockback and sweeping
 		knockbackFeature.applyAttackKnockback(attacker, living, attack.knockback());
 		if (attack.sweeping()) {
-			affectedEntities = sweepingFeature.applySweeping(attacker, living, attack.damage());
+			affectedEntities = sweepingFeature.applySweeping(attacker, living, attack.sweepDamage(), attack.cooldownProgress());
 			affectedEntities.add(living);
 		}
 
@@ -216,57 +224,58 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			// 1. Negate fall damage
 			fallFeature.resetFallDistance(attacker);
 
-			// 2. AoE Smash Knockback
+			// 2. AoE Smash Knockback (vanilla: MaceItem#knockback)
+			// The attacker also loses its vertical momentum (y velocity is set to 0.01 blocks/tick)
+			attacker.setVelocity(attacker.getVelocity().withY(0.01 * ServerFlag.SERVER_TICKS_PER_SECOND));
+			if (attacker instanceof CombatPlayer customAttacker) {
+				customAttacker.sendImmediateVelocityUpdate();
+			}
 			if (target.getInstance() != null) {
 				Pos targetPos = target.getPosition();
+				double fallMultiplier = attack.fallDistance() > 5.0 ? 2.0 : 1.0;
 				for (Entity nearby : target.getInstance().getNearbyEntities(targetPos, 3.5)) {
 					if (nearby == target || nearby == attacker) continue;
 					if (!(nearby instanceof LivingEntity livingNearby)) continue;
-					if (nearby.getEntityType() == EntityType.ARMOR_STAND) continue;
-
-					double dist = targetPos.distance(nearby.getPosition());
-					if (dist <= 3.5) {
-						double strength = (3.5 - dist) / 3.5 * 0.7;
-						double kbResistance = livingNearby.getAttributeValue(Attribute.KNOCKBACK_RESISTANCE);
-						double horizontalImpulse = strength * Math.max(0.0, 1.0 - kbResistance) * ServerFlag.SERVER_TICKS_PER_SECOND;
-						double verticalImpulse = Math.min(0.5, 0.35 * (3.5 - dist) / 3.5) * ServerFlag.SERVER_TICKS_PER_SECOND;
-
-						Pos nearbyPos = nearby.getPosition();
-						Vec dir = new Vec(nearbyPos.x() - targetPos.x(), 0, nearbyPos.z() - targetPos.z());
-						if (dir.isZero()) {
-							dir = new Vec(1, 0, 0);
-						} else {
-							dir = dir.normalize();
-						}
-
-						livingNearby.setVelocity(livingNearby.getVelocity().add(
-							dir.x() * horizontalImpulse,
-							verticalImpulse,
-							dir.z() * horizontalImpulse
-						));
-						if (livingNearby instanceof CombatPlayer customNearby) {
-							customNearby.sendImmediateVelocityUpdate();
-						}
+					if (TeamUtil.isAllied(attacker, nearby)) continue;
+					if (nearby instanceof Player p && (p.getGameMode() == GameMode.SPECTATOR
+							|| (p.getGameMode() == GameMode.CREATIVE && p.isFlying()))) continue;
+					if (nearby.getEntityMeta() instanceof net.minestom.server.entity.metadata.other.ArmorStandMeta stand
+							&& stand.isMarker()) continue;
+					
+					Pos nearbyPos = nearby.getPosition();
+					if (targetPos.distanceSquared(nearbyPos) > 3.5 * 3.5) continue;
+					
+					// delta is normalized in 3D, only its horizontal components are used
+					Vec delta = new Vec(nearbyPos.x() - targetPos.x(), nearbyPos.y() - targetPos.y(), nearbyPos.z() - targetPos.z());
+					double power = (3.5 - delta.length()) * 0.7 * fallMultiplier
+							* (1.0 - livingNearby.getAttributeValue(Attribute.KNOCKBACK_RESISTANCE));
+					if (power <= 0) continue;
+					Vec push = delta.length() < 1.0E-5 ? Vec.ZERO : delta.normalize().mul(power);
+					
+					double tps = ServerFlag.SERVER_TICKS_PER_SECOND;
+					livingNearby.setVelocity(livingNearby.getVelocity().add(push.x() * tps, 0.7 * tps, push.z() * tps));
+					if (livingNearby instanceof CombatPlayer customNearby) {
+						customNearby.sendImmediateVelocityUpdate();
 					}
 				}
 			}
 
-			// 3. Wind Burst
+			// 3. Wind Burst (vanilla: explode effect of the enchantment, radius 3.5 around the attacker, no damage)
 			int windBurst = enchantmentFeature.getWindBurst(attacker);
-			if (windBurst > 0) {
-				double upwardBlocksPerTick = windBurst == 1 ? 1.2 : (windBurst == 2 ? 1.75 : 2.2);
-				double upwardVel = upwardBlocksPerTick * ServerFlag.SERVER_TICKS_PER_SECOND;
-				attacker.setVelocity(new Vec(attacker.getVelocity().x(), upwardVel, attacker.getVelocity().z()));
-				if (attacker instanceof CombatPlayer customAttacker) {
-					customAttacker.sendImmediateVelocityUpdate();
-				}
+			boolean attackerFlying = attacker instanceof Player p && p.isFlying();
+			if (windBurst > 0 && attack.fallDistance() >= 1.5 && !attackerFlying && attacker.getInstance() != null) {
+				float multiplier = windBurst <= 3
+						? new float[]{1.2f, 1.75f, 2.2f}[windBurst - 1]
+						: 1.5f + 0.35f * (windBurst - 1);
+				Pos burstPos = attacker.getPosition();
+				ExplosionKnockback.apply(attacker.getInstance(), burstPos, 3.5f, multiplier, null, fallFeature, null);
 				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(
 					SoundEvent.ENTITY_WIND_CHARGE_WIND_BURST, Sound.Source.PLAYER,
 					1.0f, 1.0f
 				), attacker);
 				attacker.sendPacketToViewersAndSelf(new ParticlePacket(
-					Particle.GUST_EMITTER_SMALL, false, false,
-					attacker.getPosition().x(), attacker.getPosition().y(), attacker.getPosition().z(),
+					Particle.GUST_EMITTER_LARGE, false, false,
+					burstPos.x(), burstPos.y(), burstPos.z(),
 					0, 0, 0, 0, 1
 				));
 			}
@@ -289,29 +298,13 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			}
 
 			// 5. Smash sounds
-			SoundEvent smashSound = attack.fallDistance() >= 5.0 ? SoundEvent.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvent.ITEM_MACE_SMASH_GROUND;
+			SoundEvent smashSound = !target.isOnGround() ? SoundEvent.ITEM_MACE_SMASH_AIR
+					: attack.fallDistance() > 5.0 ? SoundEvent.ITEM_MACE_SMASH_GROUND_HEAVY : SoundEvent.ITEM_MACE_SMASH_GROUND;
 			ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(smashSound, Sound.Source.PLAYER, 1.0f, 1.0f), target);
 		}
 
-		if (attack.spear()) {
-			if (attack.dismountTarget() && living.getVehicle() != null) {
-				living.getVehicle().removePassenger(living);
-			}
-
-			if (attack.kineticDamage() > 0) {
-				KineticWeapon kw = attacker.getItemInMainHand().get(DataComponents.KINETIC_WEAPON);
-				SoundEvent hitSound = kw != null && kw.hitSound() != null ? kw.hitSound() : SoundEvent.ITEM_SPEAR_HIT;
-				ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(hitSound, Sound.Source.PLAYER, 1.0f, 1.0f), target);
-			}
-
-			int lunge = enchantmentFeature.getLunge(attacker);
-			if (lunge > 0) {
-				performLunge(attacker, lunge);
-			}
-		}
-
 		// Play attack sounds
-		if (attack.sounds() && !attack.maceSmash()) {
+		if (attack.sounds()) {
 			Audience audience = attacker.getViewersAsAudience();
 			if (attacker instanceof Player player)
 				audience = Audience.audience(audience, player);
@@ -404,12 +397,11 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		// Calculate attacks
 		boolean strongAttack = cooldownProgress > 0.9;
 		boolean sprintAttack = attacker.isSprinting() && strongAttack;
-		int knockback = enchantmentFeature.getKnockback(attacker) + (int) attacker.getAttributeValue(Attribute.ATTACK_KNOCKBACK);
+		double knockback = enchantmentFeature.getKnockback(attacker) + attacker.getAttributeValue(Attribute.ATTACK_KNOCKBACK);
 		int fireAspect = enchantmentFeature.getFireAspect(attacker);
 
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());
 		boolean isMace = tool != null && tool.isMace();
-		boolean isSpear = tool != null && tool.isSpear();
 		double fallDistance = fallFeature.getFallDistance(attacker);
 		boolean inCobweb = attacker.getInstance() != null && attacker.getInstance().getBlock(attacker.getPosition()).compare(Block.COBWEB);
 		boolean inWater = attacker instanceof Player p && FluidUtil.isTouchingWater(p);
@@ -426,7 +418,6 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 
 		boolean critical = preSounds.critical();
 		boolean sweeping = preSounds.sweeping();
-		if (maceSmash) critical = false;
 
 		boolean sounds = version.modern();
 
@@ -445,7 +436,6 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 		magicalDamage = finalAttackEvent.getEnchantsExtraDamage();
 
 		if (maceSmash) {
-			critical = false;
 			double remaining = fallDistance;
 			float smashBonus = 0.0f;
 			double stage1 = Math.min(remaining, 3.0);
@@ -465,66 +455,9 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			}
 			damage += smashBonus;
 		}
-
-		float kineticDamage = 0.0f;
-		boolean dismountTarget = false;
-		if (isSpear) {
-			Entity attackerRoot = attacker.getVehicle() != null ? attacker.getVehicle() : attacker;
-			Entity targetRoot = target.getVehicle() != null ? target.getVehicle() : target;
-			Vec v = attackerRoot.getVelocity();
-			if (v.isZero()) {
-				Vec disp = attackerRoot.getPosition().asVec().sub(attackerRoot.getPreviousPosition().asVec());
-				if (disp.lengthSquared() < 100) v = disp;
-			}
-			Vec vAttacker = v.mul(20.0);
-
-			Vec tv = targetRoot.getVelocity();
-			if (tv.isZero()) {
-				Vec disp = targetRoot.getPosition().asVec().sub(targetRoot.getPreviousPosition().asVec());
-				if (disp.lengthSquared() < 100) tv = disp;
-			}
-			Vec vTarget = tv.mul(20.0);
-
-			Vec vRel = vAttacker.sub(vTarget);
-			Vec lookDir = attacker.getPosition().direction().normalize();
-			double speed = vAttacker.dot(lookDir);
-			double relativeSpeed = vRel.dot(lookDir);
-
-			KineticWeapon kw = attacker.getItemInMainHand().get(DataComponents.KINETIC_WEAPON);
-			float damageMultiplier;
-			float minRelativeSpeed = 4.6f;
-			float minKnockbackSpeed = 5.1f;
-			float minDismountSpeed = 11.0f;
-
-			if (kw != null) {
-				damageMultiplier = kw.damageMultiplier();
-				if (kw.damageConditions() != null) minRelativeSpeed = kw.damageConditions().minRelativeSpeed();
-				if (kw.knockbackConditions() != null) minKnockbackSpeed = kw.knockbackConditions().minSpeed();
-				if (kw.dismountConditions() != null) minDismountSpeed = kw.dismountConditions().minSpeed();
-			} else {
-				damageMultiplier = switch (attacker.getItemInMainHand().material().name().toLowerCase()) {
-					case "wooden_spear" -> { minDismountSpeed = 14.0f; yield 0.7f; }
-					case "golden_spear" -> { minDismountSpeed = 13.0f; yield 0.7f; }
-					case "stone_spear" -> { minDismountSpeed = 13.0f; yield 0.82f; }
-					case "copper_spear" -> { minDismountSpeed = 12.0f; yield 0.82f; }
-					case "iron_spear" -> { minDismountSpeed = 11.0f; yield 0.95f; }
-					case "diamond_spear" -> { minDismountSpeed = 10.0f; yield 1.075f; }
-					case "netherite_spear" -> { minDismountSpeed = 9.0f; yield 1.2f; }
-					default -> 1.0f;
-				};
-			}
-
-			if (relativeSpeed >= minRelativeSpeed) {
-				kineticDamage = (float) Math.floor(relativeSpeed * damageMultiplier);
-				damage += kineticDamage;
-			}
-
-			if (speed >= minKnockbackSpeed) {
-				knockback += Math.max(1, (int) Math.floor((speed - minKnockbackSpeed) / 2.0) + 1);
-			}
-
-			dismountTarget = speed >= minDismountSpeed && target.getVehicle() != null;
-		}
+		// Vanilla bases the sweeping damage on the damage after the cooldown and the mace bonus,
+		// but before critical hits and enchantment damage
+		float sweepDamage = damage;
 
 		// Apply critical damage and knockback
 		if (critical) damage = criticalFeature.applyToDamage(damage);
@@ -537,47 +470,14 @@ public class VanillaAttackFeature implements AttackFeature, RegistrableFeature {
 			magicalDamage > 0, fireAspect, sweeping,
 			finalAttackEvent.hasAttackSounds(),
 			finalAttackEvent.playSoundsOnFail(),
-			maceSmash, isSpear, fallDistance,
-			kineticDamage, dismountTarget
+			maceSmash, false, fallDistance,
+			0.0f, false,
+			sweepDamage, cooldownProgress
 		);
 	}
 
 	@Override
 	public boolean performLunge(LivingEntity attacker, int lunge) {
-		if (lunge <= 0) return false;
-		if (attacker.getVehicle() != null) return false;
-		if (attacker instanceof Player p) {
-			if (p.isFlying() || p.isFlyingWithElytra() || FluidUtil.isTouchingWater(p)) return false;
-			if (p.getFood() < 7 && p.getGameMode() != GameMode.CREATIVE) return false;
-			Long lastLunge = p.getTag(LAST_LUNGE_TICK);
-			if (lastLunge != null && lastLunge == p.getAliveTicks()) {
-				return false; // Already lunged this tick
-			}
-		}
-
-		Vec lookDir = attacker.getPosition().direction();
-		double yImpulse = lookDir.y();
-		// If player is on ground, give a slight upward component (0.15) so ground friction does not halt forward dash
-		if (attacker.isOnGround() && yImpulse < 0.15) {
-			yImpulse = 0.15;
-		}
-		Vec lungeVec = new Vec(lookDir.x(), yImpulse, lookDir.z()).normalize()
-				.mul(0.458 * lunge * ServerFlag.SERVER_TICKS_PER_SECOND);
-		attacker.setVelocity(attacker.getVelocity().add(lungeVec));
-		if (attacker instanceof CombatPlayer customAttacker) {
-			customAttacker.sendImmediateVelocityUpdate();
-		}
-
-		fallFeature.resetFallDistance(attacker);
-
-		SoundEvent sound = lunge >= 3 ? SoundEvent.ITEM_SPEAR_LUNGE_3 : (lunge == 2 ? SoundEvent.ITEM_SPEAR_LUNGE_2 : SoundEvent.ITEM_SPEAR_LUNGE_1);
-		ViewUtil.viewersAndSelf(attacker).playSound(Sound.sound(sound, Sound.Source.PLAYER, 1.0f, 1.0f), attacker);
-
-		if (attacker instanceof Player player) {
-			player.setTag(LAST_LUNGE_TICK, player.getAliveTicks());
-			exhaustionFeature.addExhaustion(player, (float) (4.0 * lunge));
-		}
-		itemDamageFeature.damageEquipment(attacker, EquipmentSlot.MAIN_HAND, 1);
-		return true;
+		return spearAttacks.performLunge(attacker, lunge);
 	}
 }

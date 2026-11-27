@@ -6,7 +6,9 @@ import net.minestom.server.collision.PhysicsResult;
 import net.minestom.server.collision.PhysicsUtils;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
+import net.minestom.server.entity.EquipmentSlot;
 import net.minestom.server.entity.Player;
+import net.minestom.server.item.ItemStack;
 import net.minestom.server.entity.attribute.Attribute;
 import net.minestom.server.event.EventDispatcher;
 import net.minestom.server.event.entity.EntityVelocityEvent;
@@ -33,6 +35,17 @@ public class CombatPlayerImpl extends Player implements CombatPlayer {
 		// This is difficult to implement as a feature and assumed everyone using
 		// this extension would want it to match vanilla
 		getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(1.0);
+	}
+	
+	/**
+	 * Vanilla applies equipment attribute modifiers at the end of the tick instead of directly when
+	 * the item changes, which is what makes attribute swapping work. Once the equipment feature
+	 * manages this entity, the direct application of Minestom is skipped.
+	 */
+	@Override
+	public void updateEquipmentAttributes(ItemStack oldItem, ItemStack newItem, EquipmentSlot slot) {
+		if (hasTag(io.github.togar2.pvp.feature.attributes.VanillaEquipmentFeature.SYNCED)) return;
+		super.updateEquipmentAttributes(oldItem, newItem, slot);
 	}
 	
 	@Override

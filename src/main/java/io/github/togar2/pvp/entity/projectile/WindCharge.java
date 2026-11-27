@@ -2,6 +2,7 @@ package io.github.togar2.pvp.entity.projectile;
 
 import io.github.togar2.pvp.feature.fall.FallFeature;
 import io.github.togar2.pvp.player.CombatPlayer;
+import io.github.togar2.pvp.utils.ExplosionKnockback;
 import io.github.togar2.pvp.utils.ViewUtil;
 import net.kyori.adventure.sound.Sound;
 import net.minestom.server.coordinate.Point;
@@ -23,9 +24,14 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Represents a thrown Wind Charge projectile (Minecraft 1.21).
  */
-public class WindCharge extends CustomEntityProjectile {
-	public static final double EXPLOSION_RADIUS = 3.5;
-	public static final double LAUNCH_UPWARD_POWER = 1.3 * ServerFlag.SERVER_TICKS_PER_SECOND; // ~26 blocks/s
+public class WindCharge extends CustomEntityProjectile implements Deflectable {
+	/** Vanilla WindCharge#explode radius */
+	public static final double EXPLOSION_RADIUS = 1.2;
+	/** Knockback multiplier of the wind charge explosion damage calculator */
+	public static final float KNOCKBACK_MULTIPLIER = 1.22f;
+	/** Generous radius used for catching ender pearls (instant pearl catch) */
+	private static final double PEARL_CATCH_RADIUS = 3.5;
+	private static final int NO_DEFLECT_TICKS = 5;
 	
 	private final FallFeature fallFeature;
 	private boolean exploded = false;
@@ -64,7 +70,7 @@ public class WindCharge extends CustomEntityProjectile {
 		if (instance == null) return;
 
 		Vec moveVec = end.asVec().sub(start.asVec());
-		double searchRadius = Math.max(EXPLOSION_RADIUS, moveVec.length() + 2.0);
+		double searchRadius = Math.max(PEARL_CATCH_RADIUS, moveVec.length() + 2.0);
 		for (Entity entity : instance.getNearbyEntities(end, searchRadius)) {
 			if (entity instanceof ThrownEnderpearl pearl && !pearl.isRemoved()) {
 				// Don't intercept if the pearl just spawned right inside the player in the same tick
@@ -95,6 +101,20 @@ public class WindCharge extends CustomEntityProjectile {
 		return p.sub(projection).length();
 	}
 
+	/**
+	 * Vanilla {@code ProjectileDeflection#AIM_DEFLECT}: hitting a wind charge redirects it in the look direction
+	 * of the attacker and makes the attacker its owner. A fresh wind charge cannot be deflected for 5 ticks.
+	 *
+	 * @return whether the wind charge was deflected
+	 */
+	@Override
+	public boolean deflect(Entity deflector) {
+		if (exploded || isRemoved() || getAliveTicks() < NO_DEFLECT_TICKS) return false;
+		setShooter(deflector);
+		setVelocity(deflector.getPosition().direction().mul(ServerFlag.SERVER_TICKS_PER_SECOND));
+		return true;
+	}
+	
 	@Override
 	public boolean onHit(Entity entity) {
 		explode(getPosition(), entity);
@@ -121,7 +141,7 @@ public class WindCharge extends CustomEntityProjectile {
 			directPearl.teleportOwner(pearlTeleportPos);
 			directPearl.remove();
 		}
-		for (Entity entity : instance.getNearbyEntities(explosionPos, EXPLOSION_RADIUS)) {
+		for (Entity entity : instance.getNearbyEntities(explosionPos, PEARL_CATCH_RADIUS)) {
 			if (entity instanceof ThrownEnderpearl enderpearl && !enderpearl.isRemoved()) {
 				enderpearl.teleportOwner(pearlTeleportPos);
 				enderpearl.remove();
@@ -148,43 +168,8 @@ public class WindCharge extends CustomEntityProjectile {
 			living.damage(new Damage(DamageType.WIND_CHARGE, this, getShooter(), explosionPos, 1.0f));
 		}
 		
-		// Radial Wind Burst effect: launch shooter upwards (Wind Charge jump) and knockback nearby entities
-		for (Entity entity : instance.getNearbyEntities(explosionPos, EXPLOSION_RADIUS)) {
-			if (!(entity instanceof LivingEntity living)) continue;
-			
-			Point entityPos = living.getPosition().add(0, living.getEyeHeight() / 2.0, 0);
-			Vec diff = entityPos.sub(explosionPos).asVec();
-			double dist = diff.length();
-			if (dist > EXPLOSION_RADIUS) continue;
-			
-			double factor = Math.max(0.1, 1.0 - (dist / EXPLOSION_RADIUS));
-			
-			if (living == getShooter()) {
-				// Wind Charge Jump: launch upward and cancel fall damage
-				Vec currentVel = living.getVelocity();
-				double upwardVel = LAUNCH_UPWARD_POWER * Math.max(factor, 0.75);
-				living.setVelocity(new Vec(currentVel.x(), upwardVel, currentVel.z()));
-				
-				if (fallFeature != null) {
-					fallFeature.resetFallDistance(living);
-				}
-				if (living instanceof CombatPlayer custom) {
-					custom.sendImmediateVelocityUpdate();
-				}
-			} else {
-				// Knock back target away from blast center (accounting for knockback resistance)
-				Vec dir = dist > 0.001 ? diff.normalize() : new Vec(0, 1, 0);
-				double kbRes = living.getAttributeValue(Attribute.KNOCKBACK_RESISTANCE);
-				double horizSpeed = factor * 0.9 * Math.max(0.0, 1.0 - kbRes) * ServerFlag.SERVER_TICKS_PER_SECOND;
-				double vertSpeed = Math.max(0.35, dir.y()) * factor * 0.7 * ServerFlag.SERVER_TICKS_PER_SECOND;
-				
-				Vec currentVel = living.getVelocity();
-				living.setVelocity(currentVel.add(dir.x() * horizSpeed, vertSpeed, dir.z() * horizSpeed));
-				if (living instanceof CombatPlayer custom) {
-					custom.sendImmediateVelocityUpdate();
-				}
-			}
-		}
+		// Vanilla explosion: radius 1.2, knockback multiplier 1.22, no damage and no source push
+		ExplosionKnockback.apply(instance, explosionPos, (float) EXPLOSION_RADIUS, KNOCKBACK_MULTIPLIER, this, fallFeature, null);
 	}
 
 	@Override

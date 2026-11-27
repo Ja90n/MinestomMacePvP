@@ -97,17 +97,18 @@ public enum ArmorMaterial {
 			}
 		}
 
-		if (version.modern()) {
-			ArmorMaterial armorMaterial = fromMaterial(newStack.material());
-			if (armorMaterial == null || entity.getInstance() == null) return;
-			entity.getInstance().playSound(Sound.sound(armorMaterial.equipSound, Sound.Source.PLAYER, 1f, 1f));
-		}
+		if (version.modern()) playEquipSound(entity, newStack);
+	}
+	
+	public static void playEquipSound(LivingEntity entity, ItemStack newStack) {
+		ArmorMaterial armorMaterial = fromMaterial(newStack.material());
+		if (armorMaterial == null || entity.getInstance() == null) return;
+		entity.getInstance().playSound(Sound.sound(armorMaterial.equipSound, Sound.Source.PLAYER, 1f, 1f));
 	}
 	
 	private static boolean hasDefaultAttributes(ItemStack stack) {
-		// When modifiers tag is not empty, default modifiers are not
-		return !stack.componentPatch().has(DataComponents.ATTRIBUTE_MODIFIERS)
-				|| Objects.requireNonNull(stack.get(DataComponents.ATTRIBUTE_MODIFIERS)).modifiers().isEmpty();
+		// An explicit attribute modifiers component (even an empty one) replaces the default modifiers
+		return !stack.componentPatch().has(DataComponents.ATTRIBUTE_MODIFIERS);
 	}
 	
 	public static EquipmentSlot getRequiredSlot(Material material) {

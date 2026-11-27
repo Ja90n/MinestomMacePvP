@@ -28,7 +28,7 @@ public class CustomEntityProjectile extends Entity {
     private static final BoundingBox POINT_BOX = new BoundingBox(0, 0, 0);
     private static final BoundingBox UNSTUCK_BOX = new BoundingBox(0.12, 0.6, 0.12);
 
-    private final Entity shooter;
+    private Entity shooter;
     protected boolean noClip;
 
     protected Vec collisionDirection;
@@ -59,6 +59,14 @@ public class CustomEntityProjectile extends Entity {
 
     public @Nullable Entity getShooter() {
         return shooter;
+    }
+
+    /**
+     * Changes the shooter (owner) of this projectile, for example when it is deflected.
+     */
+    public void setShooter(@Nullable Entity shooter) {
+        this.shooter = shooter;
+        if (getEntityMeta() instanceof ProjectileMeta meta) meta.setShooter(shooter);
     }
 
     /**
@@ -190,7 +198,7 @@ public class CustomEntityProjectile extends Entity {
     }
 
     protected boolean canHit(Entity entity) {
-        return entity instanceof LivingEntity && !(entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR);
+        return entity instanceof Deflectable || entity instanceof LivingEntity && !(entity instanceof Player player && player.getGameMode() == GameMode.SPECTATOR);
     }
 
     @Override
@@ -244,6 +252,12 @@ public class CustomEntityProjectile extends Entity {
                     var event = new ProjectileCollideWithEntityEvent(this, collided.collisionPoint().asPos(), collided.entity());
                     EventDispatcher.call(event);
                     if (!event.isCancelled()) {
+                        if (collided.entity() instanceof Deflectable deflectable && !(this instanceof Deflectable)) {
+                            // Vanilla: projectiles hitting a redirectable projectile (fireball, wind charge) deflect it
+                            deflectable.deflect(shooter);
+                            scheduler().scheduleNextProcess(this::remove);
+                            return;
+                        }
                         if (onHit(collided.entity())) {
                             // Don't remove now because rest of Entity#tick might throw errors
                             scheduler().scheduleNextProcess(this::remove);

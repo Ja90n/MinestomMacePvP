@@ -2,6 +2,8 @@ package io.github.togar2.pvp.feature.attack;
 
 import io.github.togar2.pvp.enchantment.EntityGroup;
 import io.github.togar2.pvp.enums.Tool;
+import io.github.togar2.pvp.utils.KnownMovement;
+import io.github.togar2.pvp.utils.TeamUtil;
 import io.github.togar2.pvp.feature.FeatureType;
 import io.github.togar2.pvp.feature.config.DefinedFeature;
 import io.github.togar2.pvp.feature.config.FeatureConfiguration;
@@ -51,8 +53,11 @@ public class VanillaSweepingFeature implements SweepingFeature {
 	public boolean shouldSweep(LivingEntity attacker, AttackValues.PreSweeping values) {
 		if (!values.strong() || values.critical() || values.sprint() || !attacker.isOnGround()) return false;
 		
-		double lastMoveDistance = attacker.getPreviousPosition().distance(attacker.getPosition()) * 0.6;
-		if (lastMoveDistance >= attacker.getAttributeValue(Attribute.MOVEMENT_SPEED)) return false;
+		// Vanilla: horizontal known movement (blocks per tick) has to be smaller than speed * 2.5
+		var movement = KnownMovement.get(attacker);
+		double dx = movement.x(), dz = movement.z();
+		double maxSpeed = attacker.getAttributeValue(Attribute.MOVEMENT_SPEED) * 2.5;
+		if (dx * dx + dz * dz >= maxSpeed * maxSpeed) return false;
 		
 		Tool tool = Tool.fromMaterial(attacker.getItemInMainHand().material());
 		return tool != null && tool.isSword();
@@ -71,6 +76,11 @@ public class VanillaSweepingFeature implements SweepingFeature {
 	
 	@Override
 	public Collection<LivingEntity> applySweeping(LivingEntity attacker, LivingEntity target, float damage) {
+		return applySweeping(attacker, target, damage, 1.0);
+	}
+	
+	@Override
+	public Collection<LivingEntity> applySweeping(LivingEntity attacker, LivingEntity target, float damage, double cooldownProgress) {
 		float sweepingDamage = getSweepingDamage(attacker, damage);
 		
 		// Loop and check for colliding entities
@@ -79,23 +89,27 @@ public class VanillaSweepingFeature implements SweepingFeature {
 		assert target.getInstance() != null;
 		for (Entity nearbyEntity : target.getInstance().getNearbyEntities(target.getPosition(), 2)) {
 			if (nearbyEntity == target || nearbyEntity == attacker) continue;
+			if (TeamUtil.isAllied(attacker, nearbyEntity)) continue;
 			if (!(nearbyEntity instanceof LivingEntity living)) continue;
 			if (nearbyEntity.getEntityType() == EntityType.ARMOR_STAND) continue;
 			if (!boundingBox.intersectEntity(target.getPosition(), nearbyEntity)) continue;
 			
 			// Apply sweeping knockback and damage to the entity
 			if (attacker.getPosition().distanceSquared(nearbyEntity.getPosition()) < 9.0) {
-				affectedEntities.add(living);
-				knockbackFeature.applySweepingKnockback(attacker, living);
 				
-				float currentDamage = sweepingDamage + enchantmentFeature.getAttackDamage(
-						attacker.getItemInMainHand(), EntityGroup.ofEntity(living));
+				// Vanilla: getEnchantedDamage(target, sweepingDamage) * attackStrength
+				float currentDamage = (sweepingDamage + enchantmentFeature.getAttackDamage(
+						attacker.getItemInMainHand(), EntityGroup.ofEntity(living))) * (float) cooldownProgress;
 				
-				living.damage(new Damage(
+				// Vanilla only applies knockback to entities that were actually hurt
+				if (living.damage(new Damage(
 						attacker instanceof Player ? DamageType.PLAYER_ATTACK : DamageType.MOB_ATTACK,
 						attacker, attacker,
 						null, currentDamage
-				));
+				))) {
+					affectedEntities.add(living);
+					knockbackFeature.applySweepingKnockback(attacker, living);
+				}
 			}
 		}
 		

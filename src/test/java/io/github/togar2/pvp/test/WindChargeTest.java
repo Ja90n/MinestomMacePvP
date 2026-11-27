@@ -82,4 +82,66 @@ public class WindChargeTest {
 		Vec vel = target.getVelocity();
 		assertTrue(vel.x() != 0 || vel.y() > 0 || vel.z() != 0, "Target should receive knockback velocity: " + vel);
 	}
+	
+	@Test
+	@DisplayName("Explosion knockback follows vanilla: (1 - dist / 2r) * exposure * multiplier, and solid blocks shield entities")
+	public void testExplosionKnockbackFormulaAndExposure() {
+		Pos center = new Pos(60, 10, 60);
+		
+		// Open air: entity directly above the center, 0.6 blocks away (dist = 0.6 / 2.4)
+		LivingEntity open = new LivingEntity(EntityType.ZOMBIE);
+		open.setInstance(instance, new Pos(60, 10.6, 60)).join();
+		io.github.togar2.pvp.utils.ExplosionKnockback.apply(instance, center, 1.2f, 1.22f, null, null, null);
+		double expected = (1.0 - 0.6 / 2.4) * 1.22 * net.minestom.server.ServerFlag.SERVER_TICKS_PER_SECOND;
+		assertEquals(expected, open.getVelocity().y(), 0.01, "Knockback power must follow the vanilla formula");
+		
+		// A solid wall between the center and the entity blocks the knockback
+		for (int y = 8; y <= 14; y++) for (int x = 69; x <= 71; x++) for (int z = 59; z <= 61; z++)
+			instance.setBlock(x, y, z, net.minestom.server.instance.block.Block.STONE);
+		LivingEntity shielded = new LivingEntity(EntityType.ZOMBIE);
+		shielded.setInstance(instance, new Pos(72.5, 10, 60.5)).join();
+		io.github.togar2.pvp.utils.ExplosionKnockback.apply(instance, new Pos(68.5, 10.5, 60.5), 3.5f, 2.2f, null, null, null);
+		assertEquals(0.0, shielded.getVelocity().length(), 1e-6, "Entities behind solid blocks must not be pushed");
+	}
+	
+	@Test
+	@DisplayName("Hitting a wind charge deflects it in the look direction and changes its owner, but not in its first 5 ticks")
+	public void testWindChargeDeflection() {
+		Player deflector = TestEnvironment.createPlayer(instance, new Pos(90, 10, 90, 90, 0)); // looking towards -x
+		Player shooter = TestEnvironment.createPlayer(instance, new Pos(95, 10, 95));
+		WindCharge windCharge = new WindCharge(shooter, fallFeature);
+		windCharge.setInstance(instance, new Pos(88, 11, 90)).join();
+		
+		assertFalse(windCharge.deflect(deflector), "A fresh wind charge cannot be deflected");
+		
+		try {
+			var field = net.minestom.server.entity.Entity.class.getDeclaredField("ticks");
+			field.setAccessible(true);
+			field.setLong(windCharge, 10);
+		} catch (ReflectiveOperationException e) {
+			// Fall back to the real tick counter below
+			for (int i = 0; i < 6; i++) windCharge.tick(i);
+		}
+		if (windCharge.getAliveTicks() < 5) for (int i = 0; i < 6; i++) windCharge.update(i);
+		
+		assertTrue(windCharge.deflect(deflector));
+		assertSame(deflector, windCharge.getShooter(), "The deflector becomes the owner");
+		assertEquals(-20.0, windCharge.getVelocity().x(), 0.01, "Velocity is the look direction at 1 block per tick");
+	}
+	
+	@Test
+	@DisplayName("Players in the same team cannot hurt each other unless friendly fire is enabled")
+	public void testFriendlyFire() {
+		var team = net.minestom.server.MinecraftServer.getTeamManager().createTeam("pvp-test-team");
+		Player a = TestEnvironment.createPlayer(instance, new Pos(100, 10, 100));
+		Player b = TestEnvironment.createPlayer(instance, new Pos(101, 10, 100));
+		a.setTeam(team);
+		b.setTeam(team);
+		assertFalse(io.github.togar2.pvp.utils.TeamUtil.canHarmPlayer(a, b));
+		team.setAllowFriendlyFire(true);
+		assertTrue(io.github.togar2.pvp.utils.TeamUtil.canHarmPlayer(a, b));
+		team.setAllowFriendlyFire(false);
+		Player outsider = TestEnvironment.createPlayer(instance, new Pos(102, 10, 100));
+		assertTrue(io.github.togar2.pvp.utils.TeamUtil.canHarmPlayer(a, outsider));
+	}
 }

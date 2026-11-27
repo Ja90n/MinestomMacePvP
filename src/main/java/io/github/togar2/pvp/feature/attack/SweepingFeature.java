@@ -35,4 +35,12 @@ public interface SweepingFeature extends CombatFeature {
 	 * Should return a collection of the affected entities.
 	 */
 	Collection<LivingEntity> applySweeping(LivingEntity attacker, LivingEntity target, float damage);
+	
+	/**
+	 * Same as {@link #applySweeping(LivingEntity, LivingEntity, float)}, but with the attack cooldown progress,
+	 * which vanilla applies to the final damage of every swept entity.
+	 */
+	default Collection<LivingEntity> applySweeping(LivingEntity attacker, LivingEntity target, float damage, double cooldownProgress) {
+		return applySweeping(attacker, target, damage);
+	}
 }
