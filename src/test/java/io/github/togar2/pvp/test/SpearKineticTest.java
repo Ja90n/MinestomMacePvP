@@ -1,142 +1,199 @@
 package io.github.togar2.pvp.test;
 
 import io.github.togar2.pvp.feature.CombatFeatures;
-import io.github.togar2.pvp.feature.FeatureType;
-import io.github.togar2.pvp.feature.attack.AttackFeature;
 import io.github.togar2.pvp.feature.attack.VanillaAttackFeature;
-import io.github.togar2.pvp.feature.config.CombatConfiguration;
-import io.github.togar2.pvp.feature.provider.DifficultyProvider;
-import io.github.togar2.pvp.utils.CombatVersion;
+import io.github.togar2.pvp.utils.KnownMovement;
 import net.minestom.server.MinecraftServer;
+import net.minestom.server.component.DataComponents;
 import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
-import net.minestom.server.entity.Entity;
 import net.minestom.server.entity.EntityType;
+import net.minestom.server.entity.GameMode;
 import net.minestom.server.entity.LivingEntity;
 import net.minestom.server.entity.Player;
+import net.minestom.server.entity.PlayerHand;
 import net.minestom.server.entity.attribute.Attribute;
+import net.minestom.server.event.EventDispatcher;
+import net.minestom.server.event.entity.EntityAttackEvent;
+import net.minestom.server.event.player.PlayerStabEvent;
+import net.minestom.server.event.player.PlayerTickEvent;
 import net.minestom.server.instance.InstanceContainer;
 import net.minestom.server.item.ItemStack;
 import net.minestom.server.item.Material;
-import net.minestom.server.component.DataComponents;
-import net.minestom.server.entity.GameMode;
-import net.minestom.server.entity.PlayerHand;
-import net.minestom.server.event.EventDispatcher;
-import net.minestom.server.event.player.PlayerHandAnimationEvent;
 import net.minestom.server.item.component.EnchantmentList;
 import net.minestom.server.item.enchant.Enchantment;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Vanilla 26.2 spear mechanics: jab (stab action), charge (kinetic weapon while using the item) and lunge.
+ */
 public class SpearKineticTest {
 	private static InstanceContainer instance;
-	private static AttackFeature attackFeature;
 	
 	@BeforeAll
 	static void setup() {
 		TestEnvironment.init();
 		instance = MinecraftServer.getInstanceManager().createInstanceContainer();
 		instance.eventNode().addChild(CombatFeatures.modernVanilla().createNode());
-		attackFeature = CombatFeatures.modernVanilla().get(FeatureType.ATTACK);
 	}
 	
-	@Test
-	void testSpearKineticDamageScaling() {
-		Player attacker = TestEnvironment.createPlayer(instance, new Pos(0, 42, 0, 0, 0)); // facing South (z+)
-		LivingEntity target = new LivingEntity(EntityType.PIG);
-		target.getAttribute(Attribute.MAX_HEALTH).setBaseValue(100.0);
-		target.heal();
-		target.setInstance(instance, new Pos(0, 42, 3)).join();
-		
-		ItemStack spear = ItemStack.of(Material.DIAMOND_SPEAR);
-		attacker.setItemInMainHand(spear);
-		io.github.togar2.pvp.enums.Tool.updateEquipmentAttributes(attacker, ItemStack.AIR, spear, net.minestom.server.entity.EquipmentSlot.MAIN_HAND, CombatVersion.MODERN);
-		
-		// High speed charging (10 blocks/sec along look direction z+)
-		// In Minestom velocity is per tick: 10 blocks/sec = 0.5 blocks/tick
-		attacker.setVelocity(new Vec(0, 0, 0.5));
-		target.setVelocity(Vec.ZERO);
-		
-		// In Diamond Spear: minRelativeSpeed = 4.6, multiplier = 1.075
-		// speed = 10.0, relativeSpeed = 10.0 >= 4.6
-		// kinetic damage = floor(10.0 * 1.075) = 10.0
-		// base attack damage = 4.0
-		// total expected damage = 14.0
-		float targetHealthBefore = target.getHealth();
-		boolean success = attackFeature.performAttack(attacker, target);
-		assertTrue(success);
-		
-		float damageDone = targetHealthBefore - target.getHealth();
-		assertEquals(14.0f, damageDone, 0.5f);
+	private static void setItemUseTime(Player player, long ticks) {
+		player.refreshItemUse(PlayerHand.MAIN, 72000L);
+		try {
+			Field field = Player.class.getDeclaredField("startItemUseTime");
+			field.setAccessible(true);
+			field.set(player, player.getAliveTicks() - ticks);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
-	@Test
-	void testSpearMountedCavalryChargingAndDismount() {
-		Player attacker = TestEnvironment.createPlayer(instance, new Pos(10, 42, 10, 0, 0));
-		LivingEntity attackerHorse = new LivingEntity(EntityType.HORSE);
-		attackerHorse.setInstance(instance, new Pos(10, 42, 10)).join();
-		attackerHorse.addPassenger(attacker);
-		
+	private static LivingEntity dummy(Pos pos) {
 		LivingEntity target = new LivingEntity(EntityType.ZOMBIE);
-		LivingEntity targetHorse = new LivingEntity(EntityType.HORSE);
-		targetHorse.setInstance(instance, new Pos(10, 42, 13)).join();
-		target.setInstance(instance, new Pos(10, 42, 13)).join();
-		targetHorse.addPassenger(target);
-		
-		attacker.setItemInMainHand(ItemStack.of(Material.NETHERITE_SPEAR));
-		
-		// Horse charging forward at 12 blocks/sec (0.6 blocks/tick)
-		// Netherite spear minDismountSpeed = 9.0
-		// Speed 12.0 >= 9.0 -> target should be dismounted!
-		attackerHorse.setVelocity(new Vec(0, 0, 0.6));
-		targetHorse.setVelocity(Vec.ZERO);
-		
-		assertTrue(target.getVehicle() != null, "Target should be mounted before attack");
-		
-		boolean success = attackFeature.performAttack(attacker, target);
-		assertTrue(success);
-		
-		assertNull(target.getVehicle(), "Target should be dismounted after being charged by spear!");
+		target.getAttribute(Attribute.ARMOR).setBaseValue(0.0);
+		target.getAttribute(Attribute.MAX_HEALTH).setBaseValue(200.0);
+		target.heal();
+		target.setInstance(instance, pos).join();
+		return target;
 	}
-
+	
 	@Test
-	void testSpearLungeSwingInAir() {
-		Player player = TestEnvironment.createPlayer(instance, new Pos(20, 42, 20, 0, 0)); // Facing South (z+)
-		player.setFood(20);
-		player.setVelocity(Vec.ZERO);
-
-		ItemStack lungeSpear = ItemStack.of(Material.NETHERITE_SPEAR)
-				.with(DataComponents.ENCHANTMENTS, new EnchantmentList(Map.of(Enchantment.LUNGE, 3)));
-		player.setItemInMainHand(lungeSpear);
-		io.github.togar2.pvp.enums.Tool.updateEquipmentAttributes(player, ItemStack.AIR, lungeSpear, net.minestom.server.entity.EquipmentSlot.MAIN_HAND, CombatVersion.MODERN);
-
-		// Swing in the air
-		EventDispatcher.call(new PlayerHandAnimationEvent(player, PlayerHand.MAIN));
-
-		// Should have been propelled forward (positive z)
-		assertTrue(player.getVelocity().z() > 20.0, "Player should be propelled forward with Lunge III (expected > 20 blocks/s, got " + player.getVelocity().z() + ")");
+	@DisplayName("Jab hits every entity in the attack range (2.0 - 4.5 blocks) and deals the attack damage attribute")
+	void testJabPiercesEntitiesInRange() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(0, 42, 0, 0, 0)); // looking towards z+
+		attacker.setItemInMainHand(ItemStack.of(Material.DIAMOND_SPEAR));
+		LivingEntity near = dummy(new Pos(0, 42, 2.8));
+		LivingEntity far = dummy(new Pos(0, 42, 4.0));
+		LivingEntity tooClose = dummy(new Pos(0, 42, 1.0));
+		LivingEntity tooFar = dummy(new Pos(0, 42, 7.0));
+		
+		double expected = attacker.getAttributeValue(Attribute.ATTACK_DAMAGE);
+		EventDispatcher.call(new PlayerStabEvent(attacker));
+		
+		assertEquals(expected, 200.0 - near.getHealth(), 0.01, "First entity in range is hit");
+		assertEquals(expected, 200.0 - far.getHealth(), 0.01, "The jab pierces and also hits the second entity");
+		assertEquals(200.0, tooClose.getHealth(), 0.01, "Closer than the minimum reach of 2.0 is not hit");
+		assertEquals(200.0, tooFar.getHealth(), 0.01, "Further than the maximum reach of 4.5 is not hit");
 	}
-
+	
 	@Test
-	void testSpearLungeOnEntityAttack() {
-		Player attacker = TestEnvironment.createPlayer(instance, new Pos(30, 42, 30, 0, 0)); // Facing South (z+)
+	@DisplayName("A normal attack click with a spear does nothing (vanilla ignores attack packets for piercing weapons)")
+	void testNormalAttackWithSpearIsIgnored() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(20, 42, 20, 0, 0));
+		attacker.setItemInMainHand(ItemStack.of(Material.DIAMOND_SPEAR));
+		LivingEntity target = dummy(new Pos(20, 42, 21.5));
+		EventDispatcher.call(new EntityAttackEvent(attacker, target));
+		assertEquals(200.0, target.getHealth(), 0.01);
+	}
+	
+	@Test
+	@DisplayName("Jab with Lunge III propels the attacker horizontally (look direction * (1,0,1) * 0.458 * level)")
+	void testJabLunge() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(40, 42, 40, 0, 45)); // pitched down
 		attacker.setFood(20);
 		attacker.setVelocity(Vec.ZERO);
-
+		attacker.setItemInMainHand(ItemStack.of(Material.NETHERITE_SPEAR)
+				.with(DataComponents.ENCHANTMENTS, new EnchantmentList(Map.of(Enchantment.LUNGE, 3))));
+		
+		EventDispatcher.call(new PlayerStabEvent(attacker));
+		
+		double expectedZ = 0.458 * 3 * 20 * Math.cos(Math.toRadians(45));
+		assertEquals(expectedZ, attacker.getVelocity().z(), 0.05, "Lunge impulse uses the horizontal part of the look direction");
+		assertEquals(0.0, attacker.getVelocity().y(), 1e-6, "Lunge has no vertical component");
+	}
+	
+	@Test
+	@DisplayName("Lunge needs enough food (>= 7) unless in creative")
+	void testLungeNeedsFood() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(60, 42, 60, 0, 0));
+		attacker.setFood(5);
+		attacker.setVelocity(Vec.ZERO);
+		attacker.setItemInMainHand(ItemStack.of(Material.NETHERITE_SPEAR)
+				.with(DataComponents.ENCHANTMENTS, new EnchantmentList(Map.of(Enchantment.LUNGE, 1))));
+		EventDispatcher.call(new PlayerStabEvent(attacker));
+		assertEquals(0.0, attacker.getVelocity().z(), 1e-6);
+		
+		attacker.setGameMode(GameMode.CREATIVE);
+		attacker.setFood(5);
+		EventDispatcher.call(new PlayerStabEvent(attacker));
+		assertTrue(attacker.getVelocity().z() > 5.0, "Creative players lunge regardless of food");
+	}
+	
+	@Test
+	@DisplayName("Charging: damage is the base attack damage + floor(relative speed * multiplier) once the damage condition is met")
+	void testChargeDamage() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(80, 42, 80, 0, 0));
+		attacker.setItemInMainHand(ItemStack.of(Material.DIAMOND_SPEAR));
+		LivingEntity target = dummy(new Pos(80, 42, 83));
+		
+		setItemUseTime(attacker, 40);
+		KnownMovement.set(attacker, new Vec(0, 0, 0.5)); // 10 blocks per second along the look direction
+		KnownMovement.set(target, Vec.ZERO);
+		
+		EventDispatcher.call(new PlayerTickEvent(attacker));
+		
+		double base = attacker.getAttribute(Attribute.ATTACK_DAMAGE).getBaseValue();
+		assertEquals(base + Math.floor(10.0 * 1.075), 200.0 - target.getHealth(), 0.01);
+	}
+	
+	@Test
+	@DisplayName("Charging below the minimum relative speed deals no damage, and a contact only hits once per 10 ticks")
+	void testChargeConditionsAndContactCooldown() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(100, 42, 100, 0, 0));
+		attacker.setItemInMainHand(ItemStack.of(Material.DIAMOND_SPEAR));
+		LivingEntity slowTarget = dummy(new Pos(100, 42, 103));
+		
+		setItemUseTime(attacker, 40);
+		KnownMovement.set(attacker, new Vec(0, 0, 0.1)); // 2 blocks per second: below the minimum of 4.6
+		EventDispatcher.call(new PlayerTickEvent(attacker));
+		assertEquals(200.0, slowTarget.getHealth(), 0.01, "Too slow to deal damage");
+		
+		KnownMovement.set(attacker, new Vec(0, 0, 0.5));
+		EventDispatcher.call(new PlayerTickEvent(attacker));
+		assertEquals(200.0, slowTarget.getHealth(), 0.01, "Still on contact cooldown from the previous contact");
+	}
+	
+	@Test
+	@DisplayName("Charging fast enough on a horse dismounts a mounted target")
+	void testChargeDismounts() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(120, 42, 120, 0, 0));
+		attacker.setItemInMainHand(ItemStack.of(Material.NETHERITE_SPEAR));
 		LivingEntity target = new LivingEntity(EntityType.ZOMBIE);
-		target.setInstance(instance, new Pos(30, 42, 33)).join();
-
-		ItemStack lungeSpear = ItemStack.of(Material.NETHERITE_SPEAR)
-				.with(DataComponents.ENCHANTMENTS, new EnchantmentList(Map.of(Enchantment.LUNGE, 3)));
-		attacker.setItemInMainHand(lungeSpear);
-		io.github.togar2.pvp.enums.Tool.updateEquipmentAttributes(attacker, ItemStack.AIR, lungeSpear, net.minestom.server.entity.EquipmentSlot.MAIN_HAND, CombatVersion.MODERN);
-
-		boolean success = attackFeature.performAttack(attacker, target);
-		assertTrue(success, "Attack with Lunge spear should succeed");
-		assertTrue(attacker.getVelocity().z() > 20.0, "Attacker should lunge forward towards target on attack");
+		LivingEntity horse = new LivingEntity(EntityType.HORSE);
+		horse.setInstance(instance, new Pos(120, 42, 123)).join();
+		target.setInstance(instance, new Pos(120, 42, 123)).join();
+		horse.addPassenger(target);
+		assertNotNull(target.getVehicle());
+		
+		setItemUseTime(attacker, 30);
+		KnownMovement.set(attacker, new Vec(0, 0, 0.6)); // 12 blocks per second, netherite dismount speed is 9
+		KnownMovement.set(horse, Vec.ZERO);
+		EventDispatcher.call(new PlayerTickEvent(attacker));
+		
+		assertNull(target.getVehicle(), "Target should be dismounted");
+	}
+	
+	@Test
+	@DisplayName("Spear jab respects the minimum attack charge (needs a full cooldown)")
+	void testJabNeedsFullCharge() {
+		Player attacker = TestEnvironment.createPlayer(instance, new Pos(140, 42, 140, 0, 0));
+		attacker.setItemInMainHand(ItemStack.of(Material.DIAMOND_SPEAR));
+		LivingEntity target = dummy(new Pos(140, 42, 143));
+		
+		EventDispatcher.call(new PlayerStabEvent(attacker));
+		double afterFirst = target.getHealth();
+		assertTrue(afterFirst < 200.0);
+		
+		// Immediately jabbing again is still on cooldown
+		target.heal();
+		EventDispatcher.call(new PlayerStabEvent(attacker));
+		assertEquals(200.0, target.getHealth(), 0.01, "The second jab happens before the attack charge has recovered");
 	}
 }

@@ -2,6 +2,7 @@ package io.github.togar2.pvp.feature.attack;
 
 import io.github.togar2.pvp.enchantment.EntityGroup;
 import io.github.togar2.pvp.enums.Tool;
+import io.github.togar2.pvp.utils.KnownMovement;
 import io.github.togar2.pvp.feature.FeatureType;
 import io.github.togar2.pvp.feature.config.DefinedFeature;
 import io.github.togar2.pvp.feature.config.FeatureConfiguration;
@@ -52,9 +53,8 @@ public class VanillaSweepingFeature implements SweepingFeature {
 		if (!values.strong() || values.critical() || values.sprint() || !attacker.isOnGround()) return false;
 		
 		// Vanilla: horizontal known movement (blocks per tick) has to be smaller than speed * 2.5
-		var previous = attacker.getPreviousPosition();
-		var current = attacker.getPosition();
-		double dx = current.x() - previous.x(), dz = current.z() - previous.z();
+		var movement = KnownMovement.get(attacker);
+		double dx = movement.x(), dz = movement.z();
 		double maxSpeed = attacker.getAttributeValue(Attribute.MOVEMENT_SPEED) * 2.5;
 		if (dx * dx + dz * dz >= maxSpeed * maxSpeed) return false;
 		
